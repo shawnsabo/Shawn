@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Build & Dist
+build/
+dist/
+*.spec
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs & Debug
+*.log
+!requirements.txt
+stderr.txt
+stdout.txt
+debug_*.txt
+exe_*.txt
+
+# Test / Temp
+test*.png
+test*.pdf
+screenshot.png
+
+# Output (user data)
+~/.cctr_export/output/
