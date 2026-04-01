@@ -1,46 +1,44 @@
-# CCTRCloud Export Desktop
+# CCTRCloud Export Desktop ⭐
 
-基于 Python + PySide6 的 CCTRCloud 题目导出桌面工具，从 Kotlin/Compose 版本重建。
+> 沈阳理工大学课程格子(CCTRCloud) 导出工具 — 开源桌面版
+
+[![GitHub stars](https://img.shields.io/github/stars/shawnsabo/Shawn?style=social)](https://github.com/shawnsabo/Shawn/stargazers)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+---
 
 ## 功能
 
-- 🔐 登录 CCTRCloud 账号（RSA 加密）
-- 📋 获取练习列表、章节、题型
-- 📸 将题目 HTML 渲染为图片
-- 📄 导出为 PNG / PDF
-- 📦 自动打包 ZIP
-- ⚙️ Edge WebDriver 自动管理
-- 📝 任务队列管理（等待/运行/成功/失败）
-- 🔄 失败任务重试
-- 📊 实时日志查看
-- 🌙 深色主题
+- 登录 CCTRCloud 账号（RSA 加密）
+- 获取学习通课程列表、章节、作业
+- 题目 HTML 渲染为图片 / 导出为 PNG / PDF
+- 自动打包 ZIP
+- Edge WebDriver 自动检测安装
+- 任务状态：待处理 / 处理中 / 成功 / 失败
+- 失败重试机制
+- 实时日志查看
+- 主题切换
+
+## 使用方法
+
+1. 点击主界面「登录学习通」按钮，按提示输入学校名、账号、密码并登录
+2. 选择需要导出内容的课程
+3. 选择章节范围（支持全选）
+4. 选择导出格式：PDF / PNG
+5. 点击「开始导出任务」
+6. 在导出列表中查看进度，日志页面查看详细日志
+
+> [!IMPORTANT]
+> **免责声明**: 本品开源以便利学生为目的，
+> **不建议也不鼓励** 以此进行任何 **盈利性操作**。
+> 如产生任何问题均由使用者自行承担。
 
 ## 安装
 
 ```bash
-cd cctr2
 pip install -r requirements.txt
-```
-
-## 运行
-
-```bash
 python main.py
 ```
-
-## 使用流程
-
-1. 点击右下角 **＋** 按钮添加任务
-2. 填写学校编号、用户名、密码，点击登录
-3. 选择要导出的练习
-4. 按需选择章节和题型（留空=全部）
-5. 选择导出格式（PDF/PNG）
-6. 点击"创建并运行任务"
-7. 在任务列表中查看进度，日志页面查看详细日志
-
-## 输出目录
-
-导出文件位于 `~/.cctr_export/output/`
 
 ## 技术栈
 
@@ -50,4 +48,28 @@ python main.py
 - Selenium + Edge WebDriver (HTML 渲染)
 - pycryptodome (RSA 加密)
 - Pillow + img2pdf (图片处理)
-- SQLite (任务存储)
+- SQLite (本地存储)
+
+## 项目结构
+
+```
+cctr2/
+├── main.py              # 应用入口
+├── cctr_export/         # 核心导出模块
+│   ├── login.py         # 登录 & RSA 加密
+│   ├── fetcher.py       # 课程/章节数据获取
+│   ├── renderer.py      # HTML 渲染为图片
+│   ├── exporter.py       # PNG / PDF 导出
+│   └── storage.py        # SQLite 状态管理
+├── dist/
+│   └── CCTRCloudExport.exe  # Windows 打包版
+└── requirements.txt
+```
+
+## 输出目录
+
+导出文件默认保存在 `~/.cctr_export/output/`
+
+---
+
+如果你觉得这个项目对你有帮助，欢迎 **给个 Star ⭐**，你的支持是我继续维护的动力！
