@@ -64,6 +64,82 @@ class StatusBadge(QLabel):
         self.setFixedHeight(28)
 
 
+class SkeletonLoader(QFrame):
+    """
+    骨架屏加载器 — 替代 Spinner 的现代 Loading 方案。
+    显示灰色脉冲动画占位块，暗示内容即将加载。
+    """
+    def __init__(self, width=200, height=16, radius=6, parent=None):
+        super().__init__(parent)
+        self._w = width
+        self._h = height
+        self._radius = radius
+        self.setFixedSize(width, height)
+        self._opacity = 0.4
+        self._dir = 1
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        from PySide6.QtCore import QTimer
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self._pulse)
+        self._timer.start(30)
+
+    def _pulse(self):
+        self._opacity += 0.015 * self._dir
+        if self._opacity >= 0.75:
+            self._dir = -1
+        elif self._opacity <= 0.35:
+            self._dir = 1
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(Colors.TEXT_SECONDARY)
+        color.setAlphaF(self._opacity)
+        painter.setBrush(color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect(), self._radius, self._radius)
+        painter.end()
+
+    def stop(self):
+        self._timer.stop()
+
+
+class SkeletonCard(QWidget):
+    """
+    骨架屏任务卡片 — 3行骨架模拟真实卡片布局。
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(8)
+        layout.setContentsMargins(20, 16, 20, 16)
+        self.setFixedHeight(110)
+
+        # 行1：ID + 状态骨架
+        row1 = QHBoxLayout()
+        row1.addWidget(SkeletonLoader(80, 24, 12))
+        row1.addStretch()
+        row1.addWidget(SkeletonLoader(70, 24, 12))
+        layout.addLayout(row1)
+
+        # 行2：账号 + 格式
+        row2 = QHBoxLayout()
+        row2.addWidget(SkeletonLoader(120, 14, 6))
+        row2.addSpacing(16)
+        row2.addWidget(SkeletonLoader(50, 14, 6))
+        row2.addStretch()
+        layout.addLayout(row2)
+
+        # 行3：按钮
+        row3 = QHBoxLayout()
+        row3.addWidget(SkeletonLoader(70, 30, 8))
+        row3.addSpacing(8)
+        row3.addWidget(SkeletonLoader(70, 30, 8))
+        row3.addStretch()
+        layout.addLayout(row3)
+
+
 class SpinningIndicator(QWidget):
     """加载动画"""
     def __init__(self, parent=None, size=32):
@@ -122,30 +198,49 @@ class EmptyState(QWidget):
 
 
 class FABButton(QPushButton):
-    """浮动操作按钮"""
+    """浮动操作按钮 — 渐变风格 + 入场动画"""
     def __init__(self, icon: str = "＋", parent=None):
         super().__init__(icon, parent)
-        self.setFixedSize(56, 56)
+        self.setFixedSize(60, 60)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        # 阴影效果
+
+        # 渐变阴影（accent glow）
         shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(16)
-        shadow.setColor(QColor(Colors.ACCENT + "88"))
-        shadow.setOffset(0, 4)
+        shadow.setBlurRadius(24)
+        shadow.setColor(QColor(Colors.SHADOW_ACCENT))
+        shadow.setOffset(0, 6)
         self.setGraphicsEffect(shadow)
+
+        self._set_gradient_style()
+
+    def _set_gradient_style(self, hover=False):
+        c = Colors
+        if hover:
+            start, end = c.GRADIENT_PRIMARY_START, c.GRADIENT_PRIMARY_END
+        else:
+            start, end = c.GRADIENT_PRIMARY_END, c.GRADIENT_PRIMARY_START
+
         self.setStyleSheet(f"""
             QPushButton {{
-                background: {Colors.ACCENT};
-                color: white;
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {start}, stop:1 {end}
+                );
+                color: #ffffff;
                 border: none;
-                border-radius: 28px;
-                font-size: 24px;
+                border-radius: 30px;
+                font-size: 26px;
                 font-weight: bold;
             }}
-            QPushButton:hover {{
-                background: {Colors.ACCENT_HOVER};
-            }}
         """)
+
+    def enterEvent(self, event):
+        self._set_gradient_style(hover=True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._set_gradient_style(hover=False)
+        super().leaveEvent(event)
 
 
 class TaskCard(QFrame):

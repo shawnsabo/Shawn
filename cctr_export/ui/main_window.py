@@ -1,15 +1,78 @@
-"""主窗口 - 现代导航布局，支持深/浅色切换"""
+"""主窗口 - 深空美学 · 多浏览器兼容布局"""
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QStackedWidget, QLabel, QPushButton, QFrame, QSizePolicy, QApplication
 )
-from PySide6.QtCore import Qt, Signal, QSize, QTimer
-from PySide6.QtGui import QFont
-from .theme import Colors, get_colors, set_dark, is_dark, apply_theme
+from PySide6.QtCore import Qt, Signal, QSize, QTimer, QEasingCurve
+from PySide6.QtGui import QFont, QPainter, QPen, QColor
+from PySide6.QtWidgets import QGraphicsOpacityEffect
+from .theme import Colors, set_dark, is_dark, apply_theme
 from .components import FABButton
 from .home_page import HomePage
 from .add_page import AddPage
 from .log_page import LogPage
+
+
+class BrowserStatusIndicator(QFrame):
+    """
+    浏览器状态指示器 — 显示自动检测到的浏览器。
+    圆点 + 浏览器名称 + 版本号。
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._browser_name = "检测中..."
+        self._browser_version = ""
+        self._online = False
+        self.setFixedHeight(26)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._detect_browser()
+
+    def _detect_browser(self):
+        import threading
+        def detect():
+            try:
+                from ..browser.factory import detect_browser
+                browser, version = detect_browser()
+                self._browser_name = browser.name
+                self._browser_version = version.split(".")[0] if version else ""
+                self._online = True
+            except Exception:
+                self._browser_name = "未检测到"
+                self._browser_version = ""
+                self._online = False
+            self.update()
+
+        t = threading.Thread(target=detect, daemon=True)
+        t.start()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # 圆点
+        dot_color = QColor(Colors.SUCCESS if self._online else Colors.TEXT_DISABLED)
+        painter.setBrush(dot_color)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(4, (self.height() - 8) // 2, 8, 8)
+
+        # 文字
+        font = QFont("Segoe UI Variable", 11)
+        if not font.exactMatch():
+            font = QFont("Segoe UI", 11)
+        painter.setFont(font)
+        color = QColor(Colors.TEXT_SECONDARY if self._online else Colors.TEXT_DISABLED)
+        painter.setPen(color)
+        label = self._browser_name
+        if self._browser_version:
+            label += f"  {self._browser_version}"
+        if not self._online:
+            label = "未检测到浏览器"
+        painter.drawText(18, 0, self.width() - 8, self.height(),
+                         Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                         label)
+        painter.end()
+
+    def minimumSizeHint(self):
+        return QSize(100, 26)
 
 
 class NavButton(QPushButton):
@@ -110,19 +173,64 @@ class MainWindow(QMainWindow):
         tb_layout = QHBoxLayout(title_bar)
         tb_layout.setContentsMargins(20, 0, 20, 0)
 
-        # 主题切换按钮（左侧，大按钮）
+        # 浏览器状态指示器（左侧）
+        self._browser_status = BrowserStatusIndicator()
+        self._browser_status.setToolTip("自动检测到的浏览器内核")
+        self._browser_status.setStyleSheet(f"""
+            QFrame {{
+                background: {Colors.CARD}44;
+                border: 1px solid {Colors.BORDER};
+                border-radius: 13px;
+                padding: 0 10px 0 4px;
+            }}
+            QFrame:hover {{
+                background: {Colors.CARD_HOVER}44;
+            }}
+        """)
+        tb_layout.addWidget(self._browser_status)
+
+        tb_layout.addSpacing(12)
+
+        # 主题切换按钮
         self._theme_btn = QPushButton()
         self._update_theme_btn_style()
-        self._theme_btn.setFixedHeight(34)
+        self._theme_btn.setFixedHeight(32)
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._theme_btn.clicked.connect(self._toggle_theme)
         tb_layout.addWidget(self._theme_btn)
 
-        # 标题
-        title = QLabel("☁️ CCTR Export")
-        title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY}; padding: 0 8px;")
-        tb_layout.addWidget(title)
         tb_layout.addStretch()
+
+        # 标题
+        title = QLabel("CCTR Export")
+        title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
+        tb_layout.addWidget(title)
+
+        tb_layout.addStretch()
+
+        # 平台标签
+        platform_badge = QFrame()
+        platform_badge.setFixedHeight(26)
+        platform_badge.setStyleSheet(f"""
+            QFrame {{
+                background: {Colors.ACCENT_LIGHT};
+                color: {Colors.ACCENT};
+                border-radius: 13px;
+                padding: 0 12px;
+                font-size: 12px;
+                font-weight: 600;
+            }}
+        """)
+        pb_layout = QHBoxLayout(platform_badge)
+        pb_layout.setContentsMargins(0, 0, 0, 0)
+        pb_layout.setSpacing(0)
+        lbl = QLabel("多平台 · 多浏览器")
+        lbl.setStyleSheet(f"color: {Colors.ACCENT}; font-size: 11px; font-weight: 600;")
+        lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pb_layout.addWidget(lbl)
+        tb_layout.addWidget(platform_badge)
+
+        tb_layout.addSpacing(16)
 
         self._clock_label = QLabel()
         self._clock_label.setStyleSheet(f"font-size: 12px; color: {Colors.TEXT_SECONDARY};")
@@ -218,10 +326,67 @@ class MainWindow(QMainWindow):
         return QWidget()
 
     def _switch_page(self, page_id: str):
+        # 页切换动画：淡入
         for i, (btn, pid, _) in enumerate(self._nav_buttons):
             btn.set_active(pid == page_id)
             if pid == page_id:
-                self._stack.setCurrentIndex(i)
+                target_idx = i
+
+        # 淡出当前页（如果正在显示）
+        cur_widget = self._stack.currentWidget()
+        if cur_widget:
+            cur_opacity = QGraphicsOpacityEffect(cur_widget)
+            cur_widget.setGraphicsEffect(cur_opacity)
+
+            class FadeOut:
+                def __init__(self, w, effect):
+                    self.w = w
+                    self.effect = effect
+                    self.opacity = 1.0
+                def tick(self):
+                    self.opacity -= 0.15
+                    if self.opacity <= 0:
+                        self.w.setGraphicsEffect(None)
+                        return False
+                    self.effect.setOpacity(max(0, self.opacity))
+                    self.w.setGraphicsEffect(self.effect)
+                    return True
+
+            fo = FadeOut(cur_widget, cur_opacity)
+
+            def step():
+                if fo.tick():
+                    QTimer.singleShot(16, step)
+                else:
+                    self._stack.setCurrentIndex(target_idx)
+                    # 淡入新页
+                    new_widget = self._stack.currentWidget()
+                    new_opacity = QGraphicsOpacityEffect(new_widget)
+                    new_opacity.setOpacity(0)
+                    new_widget.setGraphicsEffect(new_opacity)
+
+                    class FadeIn:
+                        def __init__(self, w, effect):
+                            self.w = w
+                            self.effect = effect
+                            self.opacity = 0.0
+                        def tick(self):
+                            self.opacity += 0.15
+                            if self.opacity >= 1.0:
+                                self.w.setGraphicsEffect(None)
+                                return False
+                            self.effect.setOpacity(min(1.0, self.opacity))
+                            self.w.setGraphicsEffect(self.effect)
+                            return True
+
+                    fi = FadeIn(new_widget, new_opacity)
+                    def step_in():
+                        if fi.tick():
+                            QTimer.singleShot(16, step_in)
+                    step_in()
+
+            QTimer.singleShot(16, step)
+
         self._current_page_id = page_id
         self.page_changed.emit(page_id)
         self._fab.setVisible(page_id == "home")
@@ -269,6 +434,14 @@ class MainWindow(QMainWindow):
             QFrame {{
                 background: {Colors.SIDEBAR};
                 border-right: 1px solid {Colors.BORDER};
+            }}
+        """)
+        self._browser_status.setStyleSheet(f"""
+            QFrame {{
+                background: {Colors.CARD}44;
+                border: 1px solid {Colors.BORDER};
+                border-radius: 13px;
+                padding: 0 10px 0 4px;
             }}
         """)
         self._stack.setStyleSheet(f"background: {Colors.BG};")

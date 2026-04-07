@@ -25,42 +25,92 @@ class HomePage(QWidget):
         layout.setContentsMargins(24, 24, 24, 16)
         layout.setSpacing(16)
 
-        # 顶部：标题 + 搜索 + 刷新
-        header = QHBoxLayout()
-        self._title = SectionTitle("任务列表")
-        header.addWidget(self._title)
-        header.addStretch()
+        # 顶部：标题 + 统计卡片 + 搜索 + 刷新
+        header = QVBoxLayout()
+        header.setSpacing(12)
 
-        # 搜索框
-        self._search_input = QLineEdit()
-        self._search_input.setPlaceholderText("🔍 搜索任务...")
-        self._search_input.setFixedWidth(240)
-        self._search_input.textChanged.connect(self.refresh)
-        header.addWidget(self._search_input)
+        # 第一行：标题 + 刷新
+        row1 = QHBoxLayout()
+        self._title = SectionTitle("任务列表")
+        row1.addWidget(self._title)
+        row1.addStretch()
 
         # 刷新按钮
-        self._refresh_btn = QPushButton("🔄")
-        self._refresh_btn.setFixedSize(40, 40)
-        self._refresh_btn.setToolTip("刷新")
+        self._refresh_btn = QPushButton("↻")
+        self._refresh_btn.setFixedSize(36, 36)
+        self._refresh_btn.setToolTip("刷新列表")
         self._refresh_btn.clicked.connect(self.refresh)
         _btn_ss = f"""
             QPushButton {{
                 background: {Colors.CARD};
                 color: {Colors.TEXT_SECONDARY};
                 border: 1px solid {Colors.BORDER};
-                border-radius: 8px;
-                font-size: 16px;
+                border-radius: 10px;
+                font-size: 15px;
                 min-height: auto;
                 padding: 0;
             }}
             QPushButton:hover {{
                 background: {Colors.CARD_HOVER};
-                color: {Colors.TEXT_PRIMARY};
+                color: {Colors.ACCENT};
+                border-color: {Colors.ACCENT}66;
             }}
         """
         self._refresh_btn.setStyleSheet(_btn_ss)
         self._refresh_btn._ss = _btn_ss
-        header.addWidget(self._refresh_btn)
+        row1.addWidget(self._refresh_btn)
+        header.addLayout(row1)
+
+        # 第二行：统计概览 + 搜索
+        row2 = QHBoxLayout()
+        row2.setSpacing(12)
+
+        # 统计数字（通过 refresh 更新）
+        self._stat_waiting = QLabel("0")
+        self._stat_processing = QLabel("0")
+        self._stat_success = QLabel("0")
+        self._stat_failed = QLabel("0")
+
+        def make_stat_widget(num_label: QLabel, label_text: str, color: str) -> QFrame:
+            f = QFrame()
+            f.setStyleSheet(f"""
+                QFrame {{
+                    background: {Colors.CARD};
+                    border: 1px solid {Colors.BORDER};
+                    border-radius: 10px;
+                    padding: 10px 16px;
+                    min-width: 90px;
+                }}
+            """)
+            vl = QVBoxLayout(f)
+            vl.setSpacing(2)
+            vl.setContentsMargins(12, 10, 12, 10)
+            num_label.setStyleSheet(f"font-size: 22px; font-weight: 800; color: {color};")
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet(f"font-size: 11px; color: {Colors.TEXT_SECONDARY}; font-weight: 500;")
+            vl.addWidget(num_label)
+            vl.addWidget(lbl)
+            return f
+
+        self._stat_waiting_w = make_stat_widget(self._stat_waiting, "等待中", Colors.WARNING)
+        self._stat_processing_w = make_stat_widget(self._stat_processing, "进行中", Colors.INFO)
+        self._stat_success_w = make_stat_widget(self._stat_success, "已成功", Colors.SUCCESS)
+        self._stat_failed_w = make_stat_widget(self._stat_failed, "已失败", Colors.ERROR)
+
+        row2.addWidget(self._stat_waiting_w)
+        row2.addWidget(self._stat_processing_w)
+        row2.addWidget(self._stat_success_w)
+        row2.addWidget(self._stat_failed_w)
+
+        # 搜索框（右侧）
+        self._search_input = QLineEdit()
+        self._search_input.setPlaceholderText("搜索任务 ID / 账号...")
+        self._search_input.setFixedWidth(220)
+        self._search_input.textChanged.connect(self.refresh)
+        row2.addStretch()
+        row2.addWidget(self._search_input)
+        header.addLayout(row2)
+
         layout.addLayout(header)
 
         # 滚动区域放卡片
@@ -93,10 +143,19 @@ class HomePage(QWidget):
         layout.addWidget(self._empty)
 
     def refresh(self):
-        tasks = get_all_tasks()
+        all_tasks = get_all_tasks()
         keyword = self._search_input.text().strip().lower()
         if keyword:
-            tasks = [t for t in tasks if keyword in t.username.lower() or keyword in str(t.id)]
+            tasks = [t for t in all_tasks if keyword in t.username.lower() or keyword in str(t.id)]
+        else:
+            tasks = all_tasks
+
+        # 更新统计
+        from ..core.database import TaskStatus
+        self._stat_waiting.setText(str(sum(1 for t in all_tasks if t.status == TaskStatus.WAITING)))
+        self._stat_processing.setText(str(sum(1 for t in all_tasks if t.status == TaskStatus.PROCESSING)))
+        self._stat_success.setText(str(sum(1 for t in all_tasks if t.status == TaskStatus.SUCCESS)))
+        self._stat_failed.setText(str(sum(1 for t in all_tasks if t.status == TaskStatus.FAILED)))
 
         # 清空旧卡片
         while self._cards_layout.count():
