@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (
     QGridLayout, QSizePolicy, QMessageBox, QFrame, QStackedWidget,
     QGraphicsDropShadowEffect
 )
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtGui import QColor, QImage, QPixmap
 from ..core.api import CCTRClient
 from ..core.database import add_task, ExportType
 from ..core.tasks import engine
@@ -15,12 +15,29 @@ from .components import Card, StepIndicator
 from .theme import Colors
 
 
+class _CaptchaThread(QThread):
+    """验证码图片获取线程（网络请求不阻塞 UI）"""
+    fetched = Signal(object)  # PNG bytes
+    failed = Signal(str)
+
+    def __init__(self, client: CCTRClient):
+        super().__init__()
+        self._client = client
+
+    def run(self):
+        try:
+            self.fetched.emit(self._client.fetch_captcha())
+        except Exception as e:
+            self.failed.emit(str(e))
+
+
 class AddPage(QWidget):
     task_created = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._client: CCTRClient | None = None
+        self._captcha_thread: _CaptchaThread | None = None
         self._practices: list[Practice] = []
         self._chapters: list[ChapterType] = []
         self._qtypes: list[QuestionType] = []
@@ -132,6 +149,31 @@ class AddPage(QWidget):
         self._pass_input.setEchoMode(QLineEdit.EchoMode.Password)
         form.addWidget(self._pass_input, 2, 1)
 
+        form.addWidget(self._make_label("验证码"), 3, 0)
+        captcha_row = QHBoxLayout()
+        self._captcha_input = QLineEdit()
+        self._captcha_input.setPlaceholderText("输入右侧 4 位字符")
+        self._captcha_input.setMaxLength(8)
+        captcha_row.addWidget(self._captcha_input, stretch=1)
+        self._captcha_image = QLabel()
+        self._captcha_image.setFixedSize(120, 34)
+        self._captcha_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._captcha_image.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._captcha_image.setToolTip("看不清？点击图片刷新验证码")
+        self._captcha_image.setStyleSheet(f"""
+            QLabel {{
+                border: 1px solid {Colors.BORDER};
+                border-radius: 6px;
+                background: {Colors.INPUT_BG};
+                color: {Colors.TEXT_DISABLED};
+                font-size: 11px;
+            }}
+        """)
+        self._captcha_image.mousePressEvent = lambda _event: self._load_captcha()
+        self._captcha_image.setText("加载中…")
+        captcha_row.addWidget(self._captcha_image)
+        form.addLayout(captcha_row, 3, 1)
+
         lc.addLayout(form)
 
         self._login_status = QLabel("")
@@ -174,13 +216,13 @@ class AddPage(QWidget):
         self._practice_list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._practice_checks: list[tuple[QCheckBox, Practice]] = []
 
-        practice_scroll = QScrollArea()
-        practice_scroll.setWidgetResizable(True)
-        practice_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        practice_scroll.setStyleSheet(f"background: {Colors.BG};")
-        practice_scroll.setWidget(self._practice_list_widget)
-        practice_scroll.setMinimumHeight(300)
-        s2.addWidget(practice_scroll)
+        self._practice_scroll = QScrollArea()
+        self._practice_scroll.setWidgetResizable(True)
+        self._practice_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self._practice_scroll.setStyleSheet(f"background: {Colors.BG};")
+        self._practice_scroll.setWidget(self._practice_list_widget)
+        self._practice_scroll.setMinimumHeight(300)
+        s2.addWidget(self._practice_scroll)
 
         # 底部导航
         s2_nav = QHBoxLayout()
@@ -422,13 +464,50 @@ class AddPage(QWidget):
         self._step2_widget.setStyleSheet(self._step2_widget._ss)
         self._step3_widget.setStyleSheet(self._step3_widget._ss)
         self._practice_list_widget.setStyleSheet(self._practice_list_widget._ss)
-        self._practice_scroll.setStyleSheet(self._practice_scroll._ss)
+        self._practice_scroll.setStyleSheet(f"background: {Colors.BG};")
         # 刷新 step indicator（触发 paintEvent 重绘）
         self._step_indicator.update()
         # 重刷格式按钮
         self._select_format(self._selected_format)
         self._submit_btn.setStyleSheet(self._submit_btn._ss)
         self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 13px;")
+
+    # ── 图像验证码 ──────────────────────────────
+    def _ensure_client(self) -> CCTRClient:
+        """验证码与登录必须共用同一会话（seccode Cookie 与登录绑定）"""
+        if self._client is None:
+            self._client = CCTRClient("", "", "")
+        return self._client
+
+    def _load_captcha(self):
+        if self._captcha_thread is not None and self._captcha_thread.isRunning():
+            return
+        self._captcha_image.setText("加载中…")
+        self._captcha_thread = _CaptchaThread(self._ensure_client())
+        self._captcha_thread.fetched.connect(self._on_captcha_fetched)
+        self._captcha_thread.failed.connect(self._on_captcha_failed)
+        self._captcha_thread.start()
+
+    def _on_captcha_fetched(self, data: bytes):
+        img = QImage.fromData(data)
+        if img.isNull():
+            self._on_captcha_failed("返回的不是有效图片")
+            return
+        pix = QPixmap.fromImage(img).scaled(
+            self._captcha_image.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        self._captcha_image.setPixmap(pix)
+
+    def _on_captcha_failed(self, message: str):
+        self._captcha_image.setText("加载失败\n点击重试")
+        self._login_status.setText(f"❌ 验证码获取失败：{message}")
+        self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 13px;")
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._load_captcha()
 
     def _make_label(self, text: str) -> QLabel:
         lbl = QLabel(text)
@@ -476,8 +555,9 @@ class AddPage(QWidget):
         school = self._school_input.text().strip()
         user = self._user_input.text().strip()
         pwd = self._pass_input.text().strip()
-        if not school or not user or not pwd:
-            self._login_status.setText("❌ 请填写所有字段")
+        captcha = self._captcha_input.text().strip()
+        if not school or not user or not pwd or not captcha:
+            self._login_status.setText("❌ 请填写所有字段（含验证码）")
             self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 13px;")
             return
 
@@ -489,21 +569,24 @@ class AddPage(QWidget):
 
         class LoginThread(QThread):
             result = Signal(object, object, object)
-            def __init__(self, school, user, pwd):
+            def __init__(self, client, captcha):
                 super().__init__()
-                self.school = school
-                self.user = user
-                self.pwd = pwd
+                self.client = client
+                self.captcha = captcha
             def run(self):
                 try:
-                    c = CCTRClient(self.school, self.user, self.pwd)
-                    c.login()
-                    practices = c.get_practice_list()
-                    self.result.emit(c, practices, None)
+                    self.client.login(captcha=self.captcha)
+                    practices = self.client.get_practice_list()
+                    self.result.emit(self.client, practices, None)
                 except Exception as e:
                     self.result.emit(None, None, str(e))
 
-        self._login_thread = LoginThread(school, user, pwd)
+        # 与取验证码共用同一会话（Cookie 绑定）；登录失败后服务端会作废当前验证码
+        client = self._ensure_client()
+        client.school_id = school
+        client.username = user
+        client.password = pwd
+        self._login_thread = LoginThread(client, captcha)
         self._login_thread.result.connect(self._on_login_done)
         self._login_thread.start()
 
@@ -512,6 +595,9 @@ class AddPage(QWidget):
         if error:
             self._login_status.setText(f"❌ {error}")
             self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 13px;")
+            # 登录失败后当前验证码已作废，刷新图片并清空输入
+            self._captcha_input.clear()
+            self._load_captcha()
             return
 
         self._client = client
@@ -644,7 +730,7 @@ class AddPage(QWidget):
                     "question_types": [q.to_dict() for q in selected_qtypes],
                 })
 
-            task_id = add_task(school, user, pwd, export_type, config)
+            task_id = add_task(school, user, pwd, export_type, config, auth_key=self._client.key)
             engine.run_task(task_id)
             self.task_created.emit()
 
@@ -666,6 +752,8 @@ class AddPage(QWidget):
         self._school_input.clear()
         self._user_input.clear()
         self._pass_input.clear()
+        self._captcha_input.clear()
+        self._captcha_image.clear()
         self._login_status.setText("")
         self._practices = []
         self._selected_practices = []
