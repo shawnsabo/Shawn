@@ -159,3 +159,22 @@ def get_logs(task_id: int) -> list[dict]:
     conn.close()
     return [{"id": r["id"], "task_id": r["task_id"], "level": r["level"],
              "message": r["message"], "create_time": r["create_time"]} for r in rows]
+
+
+def get_all_logs(limit: int = 2000) -> list[dict]:
+    """最近 limit 条日志，按时间升序返回（前端自行倒序展示）"""
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT * FROM (SELECT * FROM logs ORDER BY id DESC LIMIT ?) ORDER BY id ASC",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def clear_all_logs():
+    """清空全部日志"""
+    conn = _conn()
+    conn.execute("DELETE FROM logs")
+    conn.commit()
+    conn.close()

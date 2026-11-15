@@ -1,4 +1,4 @@
-"""添加任务页面 - 步骤向导式 UI"""
+"""添加任务页面 - Element Plus / 若依 RuoYi 三步向导（含图形验证码登录）"""
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QComboBox, QCheckBox, QScrollArea,
@@ -52,23 +52,22 @@ class AddPage(QWidget):
         layout.setContentsMargins(32, 16, 32, 16)
         layout.setSpacing(12)
 
-        # 返回主页按钮
+        # 返回主页
         back_home_row = QHBoxLayout()
-        self._back_home_btn = QPushButton("← 返回主页")
+        self._back_home_btn = QPushButton("返回主页")
         self._back_home_btn.setFlat(True)
         self._back_home_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._back_home_btn.clicked.connect(lambda: self._go_home())
         _bh_ss = f"""
             QPushButton {{
                 background: transparent;
-                color: {Colors.TEXT_SECONDARY};
+                color: {Colors.ACCENT};
                 border: none;
                 font-size: 13px;
+                font-weight: 500;
                 padding: 4px 0;
             }}
-            QPushButton:hover {{
-                color: {Colors.ACCENT};
-            }}
+            QPushButton:hover {{ background: {Colors.ACCENT_LIGHT}; border-radius: 4px; }}
         """
         self._back_home_btn.setStyleSheet(_bh_ss)
         self._back_home_btn._ss = _bh_ss
@@ -76,60 +75,56 @@ class AddPage(QWidget):
         back_home_row.addStretch()
         layout.addLayout(back_home_row)
 
-        # 步骤指示器卡片（带阴影）
-        step_card = QFrame()
-        step_card.setStyleSheet(f"""
-            QFrame {{
-                background: {Colors.CARD};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 16px;
-            }}
-        """)
-        effect = QGraphicsDropShadowEffect(step_card)
-        effect.setBlurRadius(20)
-        effect.setColor(QColor(Colors.SHADOW + "30"))
-        effect.setOffset(0, 4)
-        step_card.setGraphicsEffect(effect)
-        step_card_layout = QVBoxLayout(step_card)
-        step_card_layout.setContentsMargins(24, 20, 24, 20)
+        # 步骤指示器（el-card）
+        step_card = Card(padding=10, shadow=True)
+        step_card_layout = step_card._layout
         self._step_indicator = StepIndicator(["登录", "选择练习", "导出设置"])
         step_card_layout.addWidget(self._step_indicator)
         layout.addWidget(step_card)
 
-        # 步骤内容区
+        # 步骤内容区（el-card）
         self._step_stack = QStackedWidget()
-        _stack_ss = f"background: {Colors.CARD}; border-radius: 16px; border: 1px solid {Colors.BORDER};"
+        _stack_ss = f"""
+            QStackedWidget {{
+                background: {Colors.CARD};
+                border: 1px solid {Colors.SEPARATOR};
+                border-radius: 4px;
+            }}
+        """
         self._step_stack.setStyleSheet(_stack_ss)
         self._step_stack._ss = _stack_ss
         layout.addWidget(self._step_stack, stretch=1)
 
         # ── Step 1: 登录 ──
         self._step1_widget = QWidget()
-        self._step1_widget.setStyleSheet(f"background: {Colors.BG};")
+        self._step1_widget.setStyleSheet("background: transparent;")
+        self._step1_widget._ss = self._step1_widget.styleSheet()
         s1 = QVBoxLayout(self._step1_widget)
         s1.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
 
-        login_card = Card(padding=28)
+        login_card = QWidget()
+        login_card.setStyleSheet("background: transparent;")
+        login_card_l = QVBoxLayout(login_card)
+        login_card_l.setContentsMargins(8, 8, 8, 8)
         lc = QVBoxLayout()
-        lc.setSpacing(18)
+        lc.setSpacing(14)
+        lc.setContentsMargins(0, 0, 0, 0)
 
         lc_title = QLabel("登录 CCTRCloud")
-        lc_title.setStyleSheet(f"font-size: 18px; font-weight: 700; color: {Colors.TEXT_PRIMARY};")
+        lc_title.setStyleSheet(f"font-size: 18px; font-weight: 600; color: {Colors.TEXT_PRIMARY};")
         lc_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lc.addWidget(lc_title)
 
         lc_desc = QLabel("输入你的账号信息以连接平台")
-        lc_desc.setStyleSheet(f"font-size: 13px; color: {Colors.TEXT_SECONDARY};")
+        lc_desc.setStyleSheet(f"font-size: 12px; color: {Colors.TEXT_SECONDARY};")
         lc_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lc.addWidget(lc_desc)
 
-        # 分隔线
         sep = QFrame()
         sep.setFixedHeight(1)
-        sep.setStyleSheet(f"background: {Colors.BORDER};")
+        sep.setStyleSheet(f"background: {Colors.SEPARATOR};")
         lc.addWidget(sep)
 
-        # 表单
         form = QGridLayout()
         form.setSpacing(12)
 
@@ -149,8 +144,10 @@ class AddPage(QWidget):
         self._pass_input.setEchoMode(QLineEdit.EchoMode.Password)
         form.addWidget(self._pass_input, 2, 1)
 
+        # ── 图形验证码行 ──
         form.addWidget(self._make_label("验证码"), 3, 0)
         captcha_row = QHBoxLayout()
+        captcha_row.setSpacing(10)
         self._captcha_input = QLineEdit()
         self._captcha_input.setPlaceholderText("输入右侧 4 位字符")
         self._captcha_input.setMaxLength(8)
@@ -163,9 +160,9 @@ class AddPage(QWidget):
         self._captcha_image.setStyleSheet(f"""
             QLabel {{
                 border: 1px solid {Colors.BORDER};
-                border-radius: 6px;
-                background: {Colors.INPUT_BG};
-                color: {Colors.TEXT_DISABLED};
+                border-radius: 4px;
+                background: {Colors.FILL_PRIMARY};
+                color: {Colors.TEXT_TERTIARY};
                 font-size: 11px;
             }}
         """)
@@ -178,24 +175,45 @@ class AddPage(QWidget):
 
         self._login_status = QLabel("")
         self._login_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 12px;")
         lc.addWidget(self._login_status)
 
-        self._login_btn = QPushButton("🔗 登录")
-        self._login_btn.setFixedHeight(44)
+        # el-button primary block（若依登录页样式）
+        self._login_btn = QPushButton("登 录")
+        self._login_btn.setFixedHeight(40)
+        self._login_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._login_btn.clicked.connect(self._do_login)
+        _login_ss = f"""
+            QPushButton {{
+                background: {Colors.ACCENT};
+                color: #ffffff;
+                border: none;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: 500;
+                padding: 0;
+            }}
+            QPushButton:hover {{ background: {Colors.ACCENT_HOVER}; }}
+            QPushButton:pressed {{ background: #337ECC; }}
+            QPushButton:disabled {{ background: {Colors.ACCENT_LIGHT}; color: {Colors.TEXT_DISABLED}; }}
+        """
+        self._login_btn.setStyleSheet(_login_ss)
+        self._login_btn._ss = _login_ss
         lc.addWidget(self._login_btn)
 
-        login_card.addLayout(lc)
+        login_card_l.addLayout(lc)
         s1.addWidget(login_card)
         self._step_stack.addWidget(self._step1_widget)
 
         # ── Step 2: 选择练习 ──
         self._step2_widget = QWidget()
-        self._step2_widget.setStyleSheet(f"background: {Colors.BG};")
+        self._step2_widget.setStyleSheet("background: transparent;")
+        self._step2_widget._ss = self._step2_widget.styleSheet()
         self._step2_widget.setVisible(False)
         s2 = QVBoxLayout(self._step2_widget)
+        s2.setContentsMargins(16, 14, 16, 14)
+        s2.setSpacing(10)
 
-        # 顶部操作栏
         s2_header = QHBoxLayout()
         select_all_cb = QCheckBox("全选所有练习")
         select_all_cb.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {Colors.TEXT_PRIMARY};")
@@ -204,35 +222,48 @@ class AddPage(QWidget):
         s2_header.addStretch()
 
         self._selected_count_label = QLabel("已选 0 个练习")
-        self._selected_count_label.setStyleSheet(f"font-size: 13px; color: {Colors.TEXT_SECONDARY};")
+        self._selected_count_label.setStyleSheet(f"font-size: 12px; color: {Colors.TEXT_SECONDARY};")
         s2_header.addWidget(self._selected_count_label)
         s2.addLayout(s2_header)
 
-        # 练习列表（滚动）
         self._practice_list_widget = QWidget()
-        self._practice_list_widget.setStyleSheet(f"background: {Colors.BG};")
+        self._practice_list_widget.setStyleSheet("background: transparent;")
+        self._practice_list_widget._ss = self._practice_list_widget.styleSheet()
         self._practice_list_layout = QVBoxLayout(self._practice_list_widget)
-        self._practice_list_layout.setSpacing(6)
+        self._practice_list_layout.setSpacing(4)
+        self._practice_list_layout.setContentsMargins(0, 0, 0, 0)
         self._practice_list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self._practice_checks: list[tuple[QCheckBox, Practice]] = []
 
         self._practice_scroll = QScrollArea()
         self._practice_scroll.setWidgetResizable(True)
         self._practice_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        self._practice_scroll.setStyleSheet(f"background: {Colors.BG};")
+        self._practice_scroll.setStyleSheet("background: transparent;")
         self._practice_scroll.setWidget(self._practice_list_widget)
         self._practice_scroll.setMinimumHeight(300)
         s2.addWidget(self._practice_scroll)
 
-        # 底部导航
         s2_nav = QHBoxLayout()
         s2_nav.addStretch()
         back_btn = self._make_back_btn()
         back_btn.clicked.connect(lambda: self._go_step(0))
         s2_nav.addWidget(back_btn)
-        next_btn = QPushButton("下一步 →")
-        next_btn.setFixedWidth(120)
+        next_btn = QPushButton("下一步")
+        next_btn.setFixedWidth(110)
+        next_btn.setFixedHeight(32)
+        next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         next_btn.clicked.connect(self._go_step2_to_3)
+        next_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Colors.ACCENT};
+                color: #ffffff;
+                border: none;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{ background: {Colors.ACCENT_HOVER}; }}
+        """)
         s2_nav.addWidget(next_btn)
         s2.addLayout(s2_nav)
 
@@ -240,60 +271,61 @@ class AddPage(QWidget):
 
         # ── Step 3: 导出设置 ──
         self._step3_widget = QWidget()
-        self._step3_widget.setStyleSheet(f"background: {Colors.BG};")
+        self._step3_widget.setStyleSheet("background: transparent;")
+        self._step3_widget._ss = self._step3_widget.styleSheet()
         self._step3_widget.setVisible(False)
         s3 = QVBoxLayout(self._step3_widget)
+        s3.setContentsMargins(16, 14, 16, 14)
+        s3.setSpacing(12)
 
-        # 说明
-        mode_label = QLabel("导出模式说明")
+        mode_label = QLabel("导出模式")
         mode_label.setStyleSheet(f"font-size: 14px; font-weight: 600; color: {Colors.TEXT_PRIMARY};")
         s3.addWidget(mode_label)
 
-        if isinstance(self._selected_practices, list):
-            pass  # will be updated
-
         self._export_mode_label = QLabel("当前为：单练习模式")
-        self._export_mode_label.setStyleSheet(f"font-size: 13px; color: {Colors.TEXT_SECONDARY};")
+        self._export_mode_label.setStyleSheet(f"font-size: 12px; color: {Colors.TEXT_SECONDARY};")
         s3.addWidget(self._export_mode_label)
 
         # 章节筛选
-        ch_card = Card(padding=20)
+        ch_card = Card(padding=14, shadow=False)
         ch_layout = QVBoxLayout()
         ch_title = QHBoxLayout()
-        ch_t = QLabel("📂 章节（留空则全部）")
-        ch_t.setStyleSheet(f"font-weight: 600; color: {Colors.TEXT_PRIMARY};")
+        ch_t = QLabel("章节（留空则全部）")
+        ch_t.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {Colors.TEXT_PRIMARY};")
         ch_title.addWidget(ch_t)
         ch_title.addStretch()
         self._chapter_select_all = QPushButton("全选")
         self._chapter_select_all.setFlat(True)
+        self._chapter_select_all.setCursor(Qt.CursorShape.PointingHandCursor)
         self._chapter_select_all.clicked.connect(lambda: self._toggle_all(self._chapter_checks_list, self._chapter_select_all))
         ch_title.addWidget(self._chapter_select_all)
         ch_layout.addLayout(ch_title)
 
         self._chapter_checks_list: list[QCheckBox] = []
         self._chapter_vlayout = QVBoxLayout()
-        self._chapter_vlayout.setSpacing(6)
+        self._chapter_vlayout.setSpacing(4)
         ch_layout.addLayout(self._chapter_vlayout)
         ch_card.addLayout(ch_layout)
         s3.addWidget(ch_card)
 
         # 题型筛选
-        qt_card = Card(padding=20)
+        qt_card = Card(padding=14, shadow=False)
         qt_layout = QVBoxLayout()
         qt_title = QHBoxLayout()
-        qt_t = QLabel("📝 题型（留空则全部）")
-        qt_t.setStyleSheet(f"font-weight: 600; color: {Colors.TEXT_PRIMARY};")
+        qt_t = QLabel("题型（留空则全部）")
+        qt_t.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {Colors.TEXT_PRIMARY};")
         qt_title.addWidget(qt_t)
         qt_title.addStretch()
         self._qtype_select_all = QPushButton("全选")
         self._qtype_select_all.setFlat(True)
+        self._qtype_select_all.setCursor(Qt.CursorShape.PointingHandCursor)
         self._qtype_select_all.clicked.connect(lambda: self._toggle_all(self._qtype_checks_list, self._qtype_select_all))
         qt_title.addWidget(self._qtype_select_all)
         qt_layout.addLayout(qt_title)
 
         self._qtype_checks_list: list[QCheckBox] = []
         self._qtype_vlayout = QVBoxLayout()
-        self._qtype_vlayout.setSpacing(6)
+        self._qtype_vlayout.setSpacing(4)
         qt_layout.addLayout(self._qtype_vlayout)
         qt_card.addLayout(qt_layout)
         s3.addWidget(qt_card)
@@ -301,149 +333,91 @@ class AddPage(QWidget):
         # 已练习筛选
         practiced_row = QHBoxLayout()
         self._practiced_check = QCheckBox("仅导出已练习的题目")
-        self._practiced_check.setStyleSheet(f"color: {Colors.TEXT_SECONDARY};")
+        self._practiced_check.setStyleSheet(f"color: {Colors.TEXT_PRIMARY};")
         practiced_row.addWidget(self._practiced_check)
         practiced_row.addStretch()
         s3.addLayout(practiced_row)
 
-        # 导出格式
-        fmt_card = Card(padding=20)
+        # 导出格式（el-radio-group button 风格）
+        fmt_card = Card(padding=14, shadow=False)
         fmt_layout = QVBoxLayout()
-        fmt_t = QLabel("📤 导出格式")
-        fmt_t.setStyleSheet(f"font-weight: 600; color: {Colors.TEXT_PRIMARY}; margin-bottom: 8px;")
+        fmt_t = QLabel("导出格式")
+        fmt_t.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {Colors.TEXT_PRIMARY}; margin-bottom: 6px;")
         fmt_layout.addWidget(fmt_t)
-        fmt_btn_row = QHBoxLayout()
-        self._fmt_pdf_btn = QPushButton("📄 PDF 文档")
+
+        seg = QFrame()
+        seg.setFixedHeight(36)
+        seg.setStyleSheet(f"""
+            QFrame {{
+                background: transparent;
+                border: none;
+            }}
+        """)
+        seg_l = QHBoxLayout(seg)
+        seg_l.setContentsMargins(0, 0, 0, 0)
+        seg_l.setSpacing(0)
+
+        self._fmt_pdf_btn = QPushButton("PDF 文档")
         self._fmt_pdf_btn.setCheckable(True)
         self._fmt_pdf_btn.setChecked(True)
+        self._fmt_pdf_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._fmt_pdf_btn.clicked.connect(lambda: self._select_format(ExportType.PDF))
-        self._fmt_pdf_btn.setFixedHeight(48)
-        _pdf_checked = f"""
-            QPushButton {{
-                background: {Colors.ACCENT};
-                color: #fff;
-                border-radius: 10px;
-                border: 2px solid {Colors.ACCENT};
-                font-size: 14px;
-                font-weight: 600;
-            }}
-            QPushButton:checked {{
-                background: {Colors.ACCENT};
-                border: 2px solid #fff;
-                box-shadow: 0 0 0 3px {Colors.ACCENT_LIGHT};
-            }}
-            QPushButton:!checked {{
-                background: {Colors.CARD};
-                color: {Colors.TEXT_PRIMARY};
-                border: 2px solid {Colors.BORDER};
-            }}
-            QPushButton:!checked:hover {{
-                background: {Colors.CARD_HOVER};
-                border-color: {Colors.ACCENT}66;
-            }}
-        """
-        _pdf_unchecked = f"""
-            QPushButton {{
-                background: {Colors.CARD};
-                color: {Colors.TEXT_PRIMARY};
-                border: 2px solid {Colors.BORDER};
-                border-radius: 10px;
-                font-size: 14px;
-                font-weight: 600;
-            }}
-            QPushButton:checked {{
-                background: {Colors.ACCENT};
-                border: 2px solid #fff;
-                box-shadow: 0 0 0 3px {Colors.ACCENT_LIGHT};
-            }}
-            QPushButton:!checked:hover {{
-                background: {Colors.CARD_HOVER};
-                border-color: {Colors.ACCENT}66;
-            }}
-        """
-        self._fmt_pdf_btn.setStyleSheet(_pdf_checked)
-        self._fmt_pdf_btn._ss_checked = _pdf_checked
-        self._fmt_pdf_btn._ss_unchecked = _pdf_unchecked
-        fmt_btn_row.addWidget(self._fmt_pdf_btn)
-
-        self._fmt_png_btn = QPushButton("🖼️ PNG 图片")
+        self._fmt_png_btn = QPushButton("PNG 图片")
         self._fmt_png_btn.setCheckable(True)
+        self._fmt_png_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._fmt_png_btn.clicked.connect(lambda: self._select_format(ExportType.IMG))
-        self._fmt_png_btn.setFixedHeight(48)
-        _png_checked = f"""
+
+        self._seg_selected_ss = f"""
             QPushButton {{
-                background: {Colors.ACCENT};
-                color: #fff;
-                border-radius: 10px;
-                border: 2px solid {Colors.ACCENT};
-                font-size: 14px;
-                font-weight: 600;
-            }}
-            QPushButton:checked {{
-                background: {Colors.ACCENT};
-                border: 2px solid #fff;
-                box-shadow: 0 0 0 3px {Colors.ACCENT_LIGHT};
-            }}
-            QPushButton:!checked {{
-                background: {Colors.CARD};
-                color: {Colors.TEXT_PRIMARY};
-                border: 2px solid {Colors.BORDER};
-            }}
-            QPushButton:!checked:hover {{
-                background: {Colors.CARD_HOVER};
-                border-color: {Colors.ACCENT}66;
+                background: {Colors.SEG_SELECTED_BG};
+                color: #ffffff;
+                border: 1px solid {Colors.ACCENT};
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 500;
             }}
         """
-        _png_unchecked = f"""
+        self._seg_unselected_ss = f"""
             QPushButton {{
                 background: {Colors.CARD};
                 color: {Colors.TEXT_PRIMARY};
-                border: 2px solid {Colors.BORDER};
-                border-radius: 10px;
-                font-size: 14px;
-                font-weight: 600;
+                border: 1px solid {Colors.BORDER};
+                border-radius: 0;
+                font-size: 13px;
+                font-weight: 500;
             }}
-            QPushButton:checked {{
-                background: {Colors.ACCENT};
-                color: #fff;
-                border: 2px solid {Colors.ACCENT};
-                box-shadow: 0 0 0 3px {Colors.ACCENT_LIGHT};
-            }}
-            QPushButton:!checked:hover {{
-                background: {Colors.CARD_HOVER};
-                border-color: {Colors.ACCENT}66;
-            }}
+            QPushButton:hover {{ color: {Colors.ACCENT}; }}
         """
-        self._fmt_png_btn.setStyleSheet(_png_unchecked)
-        self._fmt_png_btn._ss_checked = _png_checked
-        self._fmt_png_btn._ss_unchecked = _png_unchecked
-        fmt_btn_row.addWidget(self._fmt_png_btn)
-        fmt_btn_row.addWidget(self._fmt_png_btn)
-        fmt_layout.addLayout(fmt_btn_row)
+        seg_l.addWidget(self._fmt_pdf_btn)
+        seg_l.addWidget(self._fmt_png_btn)
+        fmt_layout.addWidget(seg)
         fmt_card.addLayout(fmt_layout)
         s3.addWidget(fmt_card)
 
-        # 底部导航
+        s3.addStretch()
+
         s3_nav = QHBoxLayout()
         s3_nav.addStretch()
         s3_back = self._make_back_btn()
         s3_back.clicked.connect(lambda: self._go_step(1))
         s3_nav.addWidget(s3_back)
 
-        self._submit_btn = QPushButton("🚀 开始导出")
-        self._submit_btn.setFixedSize(160, 48)
+        # el-button success
+        self._submit_btn = QPushButton("开始导出")
+        self._submit_btn.setFixedSize(140, 40)
+        self._submit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._submit_btn.clicked.connect(self._submit)
         _sub_ss = f"""
             QPushButton {{
                 background: {Colors.SUCCESS};
-                color: #fff;
-                border-radius: 8px;
-                font-size: 15px;
-                font-weight: 700;
-                min-height: auto;
+                color: #ffffff;
+                border: none;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: 500;
                 padding: 0;
             }}
-            QPushButton:hover {{ background: #4ade80; }}
+            QPushButton:hover {{ background: {Colors.SUCCESS_HOVER}; }}
         """
         self._submit_btn.setStyleSheet(_sub_ss)
         self._submit_btn._ss = _sub_ss
@@ -452,8 +426,8 @@ class AddPage(QWidget):
 
         self._step_stack.addWidget(self._step3_widget)
 
-        # 保存选中的格式
         self._selected_format = ExportType.PDF
+        self._select_format(ExportType.PDF)
 
     def refresh_theme(self):
         """切换主题后刷新所有样式"""
@@ -464,13 +438,21 @@ class AddPage(QWidget):
         self._step2_widget.setStyleSheet(self._step2_widget._ss)
         self._step3_widget.setStyleSheet(self._step3_widget._ss)
         self._practice_list_widget.setStyleSheet(self._practice_list_widget._ss)
-        self._practice_scroll.setStyleSheet(f"background: {Colors.BG};")
-        # 刷新 step indicator（触发 paintEvent 重绘）
+        self._practice_scroll.setStyleSheet("background: transparent;")
         self._step_indicator.update()
-        # 重刷格式按钮
         self._select_format(self._selected_format)
         self._submit_btn.setStyleSheet(self._submit_btn._ss)
-        self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 13px;")
+        self._login_btn.setStyleSheet(self._login_btn._ss)
+        self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 12px;")
+        self._captcha_image.setStyleSheet(f"""
+            QLabel {{
+                border: 1px solid {Colors.BORDER};
+                border-radius: 4px;
+                background: {Colors.FILL_PRIMARY};
+                color: {Colors.TEXT_TERTIARY};
+                font-size: 11px;
+            }}
+        """)
 
     # ── 图像验证码 ──────────────────────────────
     def _ensure_client(self) -> CCTRClient:
@@ -503,7 +485,7 @@ class AddPage(QWidget):
     def _on_captcha_failed(self, message: str):
         self._captcha_image.setText("加载失败\n点击重试")
         self._login_status.setText(f"❌ 验证码获取失败：{message}")
-        self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 13px;")
+        self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 12px;")
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -511,35 +493,37 @@ class AddPage(QWidget):
 
     def _make_label(self, text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setStyleSheet(f"font-size: 13px; color: {Colors.TEXT_SECONDARY}; font-weight: 500;")
+        lbl.setStyleSheet(f"font-size: 13px; color: {Colors.TEXT_PRIMARY}; font-weight: 500;")
         return lbl
 
     def _make_back_btn(self) -> QPushButton:
-        btn = QPushButton("← 返回")
+        btn = QPushButton("返回")
         btn.setFixedWidth(100)
+        btn.setFixedHeight(32)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setStyleSheet(f"""
             QPushButton {{
-                background: transparent;
-                color: {Colors.TEXT_SECONDARY};
-                border: 1px solid {Colors.BORDER};
-                border-radius: 8px;
-                font-size: 13px;
-                min-height: auto;
-                padding: 8px 12px;
-            }}
-            QPushButton:hover {{
                 background: {Colors.CARD};
                 color: {Colors.TEXT_PRIMARY};
+                border: 1px solid {Colors.BORDER};
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: 500;
+            }}
+            QPushButton:hover {{
+                color: {Colors.ACCENT};
+                border-color: {Colors.ACCENT_LIGHT};
+                background: {Colors.ACCENT_LIGHT};
             }}
         """)
         return btn
 
     def _select_format(self, fmt):
         self._selected_format = fmt
-        self._fmt_pdf_btn.setStyleSheet(self._fmt_pdf_btn._ss_checked if fmt == ExportType.PDF else self._fmt_pdf_btn._ss_unchecked)
         self._fmt_pdf_btn.setChecked(fmt == ExportType.PDF)
-        self._fmt_png_btn.setStyleSheet(self._fmt_png_btn._ss_checked if fmt == ExportType.IMG else self._fmt_png_btn._ss_unchecked)
         self._fmt_png_btn.setChecked(fmt == ExportType.IMG)
+        self._fmt_pdf_btn.setStyleSheet(self._seg_selected_ss if fmt == ExportType.PDF else self._seg_unselected_ss)
+        self._fmt_png_btn.setStyleSheet(self._seg_selected_ss if fmt == ExportType.IMG else self._seg_unselected_ss)
 
     def _go_home(self):
         """返回主页"""
@@ -558,11 +542,11 @@ class AddPage(QWidget):
         captcha = self._captcha_input.text().strip()
         if not school or not user or not pwd or not captcha:
             self._login_status.setText("❌ 请填写所有字段（含验证码）")
-            self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 13px;")
+            self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 12px;")
             return
 
         self._login_status.setText("正在登录...")
-        self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 13px;")
+        self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 12px;")
         self._login_btn.setEnabled(False)
 
         from PySide6.QtCore import QThread, Signal
@@ -594,7 +578,7 @@ class AddPage(QWidget):
         self._login_btn.setEnabled(True)
         if error:
             self._login_status.setText(f"❌ {error}")
-            self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 13px;")
+            self._login_status.setStyleSheet(f"color: {Colors.ERROR}; font-size: 12px;")
             # 登录失败后当前验证码已作废，刷新图片并清空输入
             self._captcha_input.clear()
             self._load_captcha()
@@ -603,7 +587,7 @@ class AddPage(QWidget):
         self._client = client
         self._practices = practices
         self._login_status.setText(f"✅ 登录成功，获取到 {len(practices)} 个练习")
-        self._login_status.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: 13px;")
+        self._login_status.setStyleSheet(f"color: {Colors.SUCCESS}; font-size: 12px;")
 
         # 构建练习列表（去重）
         seen = set()
@@ -627,12 +611,12 @@ class AddPage(QWidget):
             # 课程分组标签
             if current_lesson != p.lesson_name:
                 if current_lesson is not None:
-                    sep = QLabel("")  # 小间距
-                    sep.setFixedHeight(8)
+                    sep = QLabel("")
+                    sep.setFixedHeight(6)
                     self._practice_list_layout.addWidget(sep)
-                lesson_label = QLabel(f"📚 {p.lesson_name}")
+                lesson_label = QLabel(p.lesson_name)
                 lesson_label.setStyleSheet(f"""
-                    font-size: 12px; font-weight: 700;
+                    font-size: 11px; font-weight: 600;
                     color: {Colors.TEXT_SECONDARY};
                     padding: 4px 0;
                 """)
@@ -640,7 +624,7 @@ class AddPage(QWidget):
                 current_lesson = p.lesson_name
 
             cb = QCheckBox(p.practice_name)
-            cb.setStyleSheet(f"color: {Colors.TEXT_PRIMARY}; font-size: 13px; padding: 4px 0;")
+            cb.setStyleSheet(f"color: {Colors.TEXT_PRIMARY}; font-size: 13px; padding: 3px 0;")
             cb.stateChanged.connect(self._update_selected_count)
             self._practice_checks.append((cb, p))
             self._practice_list_layout.addWidget(cb)
@@ -755,6 +739,7 @@ class AddPage(QWidget):
         self._captcha_input.clear()
         self._captcha_image.clear()
         self._login_status.setText("")
+        self._login_status.setStyleSheet(f"color: {Colors.TEXT_SECONDARY}; font-size: 12px;")
         self._practices = []
         self._selected_practices = []
         for cb, _ in self._practice_checks:
