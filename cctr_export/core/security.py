@@ -5,12 +5,13 @@ import io
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 
-# CCTRCloud 公钥（来自 config.js）
+# CCTRCloud 公钥（www.cctrcloud.net/practice/js/config.js，2026-11 实测现行版本；
+# 旧公钥已被平台弃用）
 _PUB_KEY_B64 = (
-    "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDLyh5Lb/5TprGvS9yFCcpCYnb0"
-    "FuSyY3+TPbJI7Pv3+u4eFoqGGN46qyFOVLhUuFRttMfoA8h8yrdYCssLi93baoByT"
-    "MYf5/KVlviLKXWd3TDOJdeSX4d+qLUp/WK0ckm2VaJuY5vW0x5x6WbZ8MSxwTDMqN"
-    "NMgVUdOgD3MIScwIDAQAB"
+    "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDO3r40irpueBqKoCSh01YG8qhX"
+    "XH10pgZje98q7ZvjOWad/da8Eejrbs3uyNOEwYmFJckUA8X0MiGOr3Mlv1VAXTA9"
+    "T9YxbBObkLNUMj2VWLbjgZNiDzZwqeprLVvIbQSLSEUseVf/EmdCeEgMOzxnahsK"
+    "KIs7u+iN13xPFBY0kwIDAQAB"
 )
 
 _cipher = PKCS1_v1_5.new(RSA.import_key(base64.b64decode(_PUB_KEY_B64)))

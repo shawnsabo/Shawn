@@ -1,6 +1,7 @@
 """CCTRCloud API 客户端"""
 from __future__ import annotations
 import json
+import random
 from urllib.parse import quote
 from typing import Optional
 import httpx
@@ -26,8 +27,21 @@ class CCTRClient:
             headers={"User-Agent": "Mozilla/5.0"},
         )
 
+    # ── 图像验证码 ────────────────────────────────
+    def fetch_captcha(self) -> bytes:
+        """获取图像验证码 PNG。
+
+        验证码与服务端会话 Cookie（PHPSESSID / seccode）绑定，
+        必须与后续 login() 使用同一个 Client 实例。
+        """
+        r = self._client.get(
+            f"{BASE}?act=seccode&op=makecode&t={random.random()}"
+        )
+        r.raise_for_status()
+        return r.content
+
     # ── 登录 ──────────────────────────────────────
-    def login(self) -> None:
+    def login(self, captcha: str = "") -> None:
         # 获取 schoolId
         r = self._client.post(
             f"{BASE}?act=login&op=getschoolData",
@@ -47,6 +61,7 @@ class CCTRClient:
                 ("password", rsa_encrypt(self.password)),
                 ("schoolid", real_school_id),
                 ("client", "web"),
+                ("captcha", captcha),
             ]),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )

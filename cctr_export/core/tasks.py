@@ -53,11 +53,17 @@ class TaskEngine:
 
         client: Optional[CCTRClient] = None
         try:
-            # 1. 登录
-            add_log(task_id, LogLevel.INFO, f"正在登录: {task.username}")
+            # 1. 认证（优先复用创建任务时已通过图形验证码登录的会话 key）
             client = CCTRClient(task.school_id, task.username, task.password)
-            client.login()
-            add_log(task_id, LogLevel.INFO, "登录成功")
+            if task.auth_key:
+                add_log(task_id, LogLevel.INFO, "使用创建任务时的登录会话")
+                client.key = task.auth_key
+            else:
+                add_log(task_id, LogLevel.WARN,
+                        "任务未携带登录会话，尝试直接登录；若提示验证码错误，请在「添加任务」页重新创建任务")
+                add_log(task_id, LogLevel.INFO, f"正在登录: {task.username}")
+                client.login()
+                add_log(task_id, LogLevel.INFO, "登录成功")
 
             # 2. 获取题目
             all_questions = []

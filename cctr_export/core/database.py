@@ -38,6 +38,7 @@ class TaskRecord:
     create_time: str
     config: list[dict] = field(default_factory=list)  # [{practice, chapters:[], question_types:[]}]
     log: str = ""
+    auth_key: str = ""  # 创建任务时通过图形验证码登录得到的会话 key
 
 
 def _db_path() -> Path:
@@ -76,17 +77,22 @@ def init_db():
             create_time TEXT NOT NULL
         )
     """)
+    # 旧库迁移：tasks 增加 auth_key 列（平台上线图形验证码后，登录 key 在创建任务时取得）
+    try:
+        conn.execute("ALTER TABLE tasks ADD COLUMN auth_key TEXT NOT NULL DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # 列已存在
     conn.commit()
     conn.close()
 
 
 def add_task(school_id: str, username: str, password: str,
-             export_type: ExportType, config: list[dict]) -> int:
+             export_type: ExportType, config: list[dict], auth_key: str = "") -> int:
     conn = _conn()
     cur = conn.execute(
-        "INSERT INTO tasks (school_id, username, password, status, export_type, create_time, config) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO tasks (school_id, username, password, status, export_type, create_time, config, auth_key) VALUES (?,?,?,?,?,?,?,?)",
         (school_id, username, password, TaskStatus.WAITING.value, export_type.value,
-         datetime.now().isoformat(), json.dumps(config, ensure_ascii=False))
+         datetime.now().isoformat(), json.dumps(config, ensure_ascii=False), auth_key)
     )
     conn.commit()
     tid = cur.lastrowid
@@ -110,7 +116,7 @@ def get_all_tasks() -> list[TaskRecord]:
             id=r["id"], school_id=r["school_id"], username=r["username"],
             password=r["password"], status=TaskStatus(r["status"]),
             export_type=ExportType(r["export_type"]), create_time=r["create_time"],
-            config=json.loads(r["config"]),
+            config=json.loads(r["config"]), auth_key=r["auth_key"] or "",
         ) for r in rows
     ]
 
@@ -125,7 +131,7 @@ def get_task(task_id: int) -> Optional[TaskRecord]:
         id=r["id"], school_id=r["school_id"], username=r["username"],
         password=r["password"], status=TaskStatus(r["status"]),
         export_type=ExportType(r["export_type"]), create_time=r["create_time"],
-        config=json.loads(r["config"]),
+        config=json.loads(r["config"]), auth_key=r["auth_key"] or "",
     )
 
 
@@ -153,3 +159,22 @@ def get_logs(task_id: int) -> list[dict]:
     conn.close()
     return [{"id": r["id"], "task_id": r["task_id"], "level": r["level"],
              "message": r["message"], "create_time": r["create_time"]} for r in rows]
+
+
+def get_all_logs(limit: int = 2000) -> list[dict]:
+    """最近 limit 条日志，按时间升序返回（前端自行倒序展示）"""
+    conn = _conn()
+    rows = conn.execute(
+        "SELECT * FROM (SELECT * FROM logs ORDER BY id DESC LIMIT ?) ORDER BY id ASC",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def clear_all_logs():
+    """清空全部日志"""
+    conn = _conn()
+    conn.execute("DELETE FROM logs")
+    conn.commit()
+    conn.close()

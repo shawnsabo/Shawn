@@ -31,27 +31,33 @@ _RENDER_TEMPLATE = """<!DOCTYPE html>
 <body>
 <div class="question">{subject_html}</div>
 {options_html}
-<div class="answer"><div class="label">答案</div>{answer_html}</div>
+{answer_block}
 </body>
 </html>
 """
 
 
-def _build_html(question: Question) -> str:
+def _build_html(question: Question, variant: str = "withAnswersRed") -> str:
+    """variant: withAnswersRed(正确项标红+答案) / withAnswersPlain(答案不标红) / withoutAnswers(无答案)"""
     options_html = ""
     if question.has_options and question.options:
         opts = []
         for opt in question.options:
-            if opt.is_true:
+            if opt.is_true and variant == "withAnswersRed":
                 opts.append(f'<div class="option correct">{opt.html}</div>')
             else:
                 opts.append(f'<div class="option">{opt.html}</div>')
         options_html = "<div>" + "".join(opts) + "</div>"
 
+    if variant == "withoutAnswers":
+        answer_block = ""
+    else:
+        answer_block = f'<div class="answer"><div class="label">答案</div>{question.answer or "(无答案)"}</div>'
+
     return _RENDER_TEMPLATE.format(
         subject_html=question.subject_html or "(无题目内容)",
         options_html=options_html,
-        answer_html=question.answer or "(无答案)",
+        answer_block=answer_block,
     )
 
 
@@ -86,17 +92,17 @@ def _html_to_image(driver, html: str) -> Image.Image:
 _worker_local = threading.local()
 
 
-def _get_driver():
+def _get_driver(browser_type=None):
     """获取当前线程的 driver（懒创建）"""
     if not hasattr(_worker_local, "driver") or _worker_local.driver is None:
-        _worker_local.driver = create_driver()
+        _worker_local.driver = create_driver(browser_type=browser_type, headless=True)
     return _worker_local.driver
 
 
 def _render_one(args) -> tuple[int, Image.Image]:
     """渲染一道题目，返回 (index, image)"""
-    idx, html = args
-    driver = _get_driver()
+    idx, html, browser_type = args
+    driver = _get_driver(browser_type)
     img = _html_to_image(driver, html)
     return idx, img
 
@@ -106,13 +112,15 @@ def export_questions_to_images(
     output_dir: str | Path,
     driver_pool=None,
     progress_callback=None,
+    variant: str = "withAnswersRed",
+    browser_type=None,
 ) -> Path:
     """导出题目为 PNG 图片"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 预建所有 HTML
-    items = [(i, _build_html(q)) for i, q in enumerate(questions)]
+    items = [(i, _build_html(q, variant), browser_type) for i, q in enumerate(questions)]
 
     done = [0]
     lock = threading.Lock()
@@ -138,6 +146,8 @@ def export_questions_to_pdf(
     output_dir: str | Path,
     driver_pool=None,
     progress_callback=None,
+    variant: str = "withAnswersRed",
+    browser_type=None,
 ) -> Path:
     """导出题目为 PDF（并行渲染）"""
     import img2pdf
@@ -147,7 +157,7 @@ def export_questions_to_pdf(
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     # 预建所有 HTML
-    items = [(i, _build_html(q)) for i, q in enumerate(questions)]
+    items = [(i, _build_html(q, variant), browser_type) for i, q in enumerate(questions)]
 
     results: dict[int, Image.Image] = {}
     results_lock = threading.Lock()
