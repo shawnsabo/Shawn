@@ -34,3 +34,6 @@ screenshot.png
 
 # Output (user data)
 ~/.cctr_export/output/
+
+# portable 运行产物
+captcha_debug/
