@@ -1,5 +1,0 @@
-pyinstaller>=6.0
-httpx>=0.28
-websocket-client>=1.6
-ddddocr>=1.4
-pillow>=10.0

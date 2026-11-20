@@ -1,100 +1,65 @@
-# CCTRCloud Export Portable
+# 融智导出 Studio · 统一桌面端与安卓端题库无损导出套件
 
-> 融智云考（CCTRCloud）题库导出 · 单文件便携版
-> Designed by Silvite and Shawnmark
+> 桌面端（Windows PySide6 + Chromium/Edge + QtWebEngine）与安卓端（Kotlin Jetpack Compose）统一排版管线  
+> 验证码自动识别 · 全量分页完整性核对 · A4 10.5pt 统一字号与公式等比排版
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
-
-**单 exe · 免安装 · 免 Python 环境 · 登录验证码自动识别。**
-
-基于官方 Rust 应用 `CCTRCloudExportRust v3` 的增强便携版：题库导出管线
-100% 保留官方实现（浏览器渲染 PDF、manifest、ZIP），仅在登录环节补上
-官方版本缺失的两块拼图。
 
 ---
 
-## 背景：官方 v3 为什么登录不了
+## 直接运行成品
 
-官方 Rust v3 构建于平台的两次变更之前，登录功能已经失效：
+打开仓库根目录下的 `成品/` 文件夹即可直接使用：
 
-1. **登录验证码被服务端强制** —— 实测对所有 `client` 值均无豁免；
-2. **内嵌 RSA 公钥已被服务端弃用**（公钥轮换），密码密文无法解密。
+- `CCTRCloudExportDesktop.exe`：Windows 桌面版独立单文件程序（内置 `ddddocr` 自动识别验证码、浏览器内核自选与便携 Chromium 下载）。
+- `CCTRCloudExportAndroid.apk`：Android 移动端安装包（内置 ONNX 离线自动识别验证码、A4 无损 PDF 与分类 ZIP 导出）。
 
-本工具不修改官方程序的任何业务逻辑，只在网络层与展示层补齐这两点，
-让官方管线原样跑起来。
+---
 
-## 快速开始
+## 核心特性
 
-1. 双击 `CCTRCloudExportPortable.exe`（无需安装任何依赖）
-2. 自动弹出融智云考导出窗口，登录验证码自动识别（识别失败可手动输入）
-3. 填学校代码 / 账号 / 密码 → 登录 → 选择练习 → 确认导出
-4. ZIP 输出在 `~/.cctr_export_v3/`
+1. **统一排版与字号控制**：自动剥离原始富文本中的混杂 `font-size` / `font-family`，正文严格统一为 `10.5pt`（保留 `sub`/`sup` 上下标），对 Wiris 内联 SVG 与高分辨率 Word 截屏公式图按视觉比例等比缩放，标准 A4 四周 `18mm` 留白。
+2. **完整分页与零裁剪校验**：严格核对平台分页总数，加载阶段强制等待所有图片/公式 `decode()`，支持超长图像切片与页宽溢出拦截，分类 ZIP 附带 SHA-256 `导出清单.json`。
+3. **导出不掉线、目录零冗余**：支持自选默认保存目录（默认 `Documents/CCTRExport` / 手机 `Download/CCTRExport`），PDF/ZIP 直接输出清晰命名文件，不生成空数字子目录；导出完成后保留当前登录会话与课程列表。
+4. **渲染内核自选**：桌面端支持自动优选 / Edge / Chrome / 便携 Chromium（支持一键下载）与内置 QtWebEngine 兜底。
 
-## 工作原理
-
-```
-CCTRCloudExportPortable.exe（单文件）
-  ├─ 释放内嵌官方 Rust 应用 → 两处等长内存补丁
-  │    ├─ API 基址 → http://127.0.0.1:8899（本地代理）
-  │    └─ RSA 公钥 → 现行版本（取自官方 Web 端 config.js）
-  ├─ 本地代理转发全部 API 流量
-  │    └─ 仅截获登录请求：用请求自带会话 Cookie 获取验证码
-  │       → ddddocr 本地 OCR → 自动补 captcha 参数 → 转发
-  ├─ WebView2 CDP 将验证码行注入官方登录界面（OCR 失败可手输）
-  └─ OCR 连续失败 3 次 → 自动转人工确认对话框
-```
-
-- 官方应用的导出逻辑、渲染管线、打包方式**零改动**；
-- 所有网络流量仅经过本机回环地址，不经过任何第三方；
-- 原 exe 永不落地修改，补丁副本每次启动时在临时目录重建。
+---
 
 ## 仓库结构
 
-```
-cctr_export/             桌面版（PySide6，Element Plus 风格 UI）
-  ├─ core/               登录（含验证码参数）/ 抓题 / 渲染 / 任务引擎
-  ├─ platforms/          题库平台抽象层
-  └─ ui/                 桌面界面
-portable/                单文件便携版构建源
-  ├─ launcher_portable.py   便携版核心（代理 + OCR + CDP 注入 + 补丁）
-  ├─ build.bat              一键构建脚本
-  └─ requirements-build.txt 构建依赖
-main.py                  桌面版入口
+```text
+cctr_export/            桌面端源码（PySide6 WebView + Core 引擎）
+  ├─ core/              API、验证码 OCR、富文本/PDF 完整性校验、内核管理、任务引擎
+  └─ ui/                Quiet Paper & Indigo Ink Studio 界面与 WebChannel 桥接
+android/                安卓端源码（Kotlin + Jetpack Compose + ONNX OCR）
+desktop/                桌面端 PyInstaller 单文件打包脚本
+design/                 Figma 设计系统与交付说明
+tests/                  Python 自动化单元测试与 PDF 完整性测试
+main.py                 桌面端入口
 ```
 
-## 从源码构建便携版
+---
 
-前置：Windows 10/11、Python 3.10+；将官方原版
-`CCTRCloudExportRust-v3.exe` 与 `WebView2Loader.dll` 放到仓库根目录。
+## 从源码开发与打包
+
+### 桌面端
 
 ```bat
-portable\build.bat
-```
-
-产物：`portable\dist\CCTRCloudExportPortable.exe`
-
-桌面版（可选）：
-
-```bat
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 python main.py
 ```
 
----
+单文件构建：`desktop\build_desktop.bat`（输出到 `成品\CCTRCloudExportDesktop.exe`）。
 
-## 免责声明
+### 安卓端
 
-本品开源以便利学生为目的，**不建议也不鼓励** 以此进行任何
-**盈利性操作**。如产生任何问题均由使用者自行承担。
-请遵守所在学校与平台的相关规定。
-
-## 致谢
-
-- Designed by **Silvite** and **Shawnmark**
-- 原始桌面工具与 Rust 应用：[shawnsabo](https://github.com/shawnsabo)
-- UI 规范：[Element Plus](https://element-plus.org/) / Apple HIG（历史版本）
+```bat
+android\gradlew.bat -p android testDebugUnitTest assembleDebug
+```
 
 ---
 
-如果你觉得这个项目对你有帮助，欢迎 **给个 Star ⭐**
+## 致谢与免责声明
+
+- 本工具仅供个人学习与课程资料整理使用，请遵守所在学校与平台规范。
+- 原始桌面工具来源：[shawnsabo](https://github.com/shawnsabo)

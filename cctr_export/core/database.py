@@ -18,6 +18,7 @@ class TaskStatus(str, Enum):
 
 class ExportType(str, Enum):
     PDF = "pdf"
+    ZIP = "zip"
     IMG = "img"
 
 
@@ -39,6 +40,7 @@ class TaskRecord:
     config: list[dict] = field(default_factory=list)  # [{practice, chapters:[], question_types:[]}]
     log: str = ""
     auth_key: str = ""  # 创建任务时通过图形验证码登录得到的会话 key
+    output_path: str = ""  # 实际导出文件或归档路径
 
 
 def _db_path() -> Path:
@@ -77,11 +79,15 @@ def init_db():
             create_time TEXT NOT NULL
         )
     """)
-    # 旧库迁移：tasks 增加 auth_key 列（平台上线图形验证码后，登录 key 在创建任务时取得）
-    try:
-        conn.execute("ALTER TABLE tasks ADD COLUMN auth_key TEXT NOT NULL DEFAULT ''")
-    except sqlite3.OperationalError:
-        pass  # 列已存在
+    # 旧库迁移：tasks 增加 auth_key 列与 output_path 列
+    for ddl in (
+        "ALTER TABLE tasks ADD COLUMN auth_key TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE tasks ADD COLUMN output_path TEXT NOT NULL DEFAULT ''",
+    ):
+        try:
+            conn.execute(ddl)
+        except sqlite3.OperationalError:
+            pass
     conn.commit()
     conn.close()
 
@@ -107,6 +113,13 @@ def update_task_status(task_id: int, status: TaskStatus):
     conn.close()
 
 
+def update_task_output_path(task_id: int, output_path: str):
+    conn = _conn()
+    conn.execute("UPDATE tasks SET output_path=? WHERE id=?", (output_path, task_id))
+    conn.commit()
+    conn.close()
+
+
 def get_all_tasks() -> list[TaskRecord]:
     conn = _conn()
     rows = conn.execute("SELECT * FROM tasks ORDER BY id DESC").fetchall()
@@ -117,6 +130,7 @@ def get_all_tasks() -> list[TaskRecord]:
             password=r["password"], status=TaskStatus(r["status"]),
             export_type=ExportType(r["export_type"]), create_time=r["create_time"],
             config=json.loads(r["config"]), auth_key=r["auth_key"] or "",
+            output_path=(r["output_path"] if "output_path" in r.keys() else "") or "",
         ) for r in rows
     ]
 
@@ -132,6 +146,7 @@ def get_task(task_id: int) -> Optional[TaskRecord]:
         password=r["password"], status=TaskStatus(r["status"]),
         export_type=ExportType(r["export_type"]), create_time=r["create_time"],
         config=json.loads(r["config"]), auth_key=r["auth_key"] or "",
+        output_path=(r["output_path"] if "output_path" in r.keys() else "") or "",
     )
 
 

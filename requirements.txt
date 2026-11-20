@@ -1,6 +1,6 @@
 PySide6>=6.8
 httpx>=0.28
-selenium>=4.25
 pycryptodome>=3.21
 Pillow>=11.0
-img2pdf>=0.5
+ddddocr>=1.4
+websocket-client>=1.6
