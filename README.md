@@ -9,7 +9,7 @@
 
 ## 直接运行成品
 
-打开仓库根目录下的 `成品/` 文件夹即可直接使用：
+前往 [v4.0.0 发布页面](https://github.com/shawnmark2023-lgtm/Shawn/releases/tag/v4.0.0) 下载成品；源码仓库不包含 `成品/` 文件夹中的安装包：
 
 - `CCTRCloudExportDesktop.exe`：Windows 桌面版独立单文件程序（内置 `ddddocr` 自动识别验证码、浏览器内核自选与便携 Chromium 下载）。
 - `CCTRCloudExportAndroid.apk`：Android 移动端安装包（内置 ONNX 离线自动识别验证码、A4 无损 PDF 与分类 ZIP 导出）。
@@ -19,7 +19,7 @@
 ## 核心特性
 
 1. **统一排版与字号控制**：自动剥离原始富文本中的混杂 `font-size` / `font-family`，正文严格统一为 `10.5pt`（保留 `sub`/`sup` 上下标），对 Wiris 内联 SVG 与高分辨率 Word 截屏公式图按视觉比例等比缩放，标准 A4 四周 `18mm` 留白。
-2. **完整分页与零裁剪校验**：严格核对平台分页总数，加载阶段强制等待所有图片/公式 `decode()`，支持超长图像切片与页宽溢出拦截，分类 ZIP 附带 SHA-256 `导出清单.json`。
+2. **智能分页与完整性校验**：导出设置中的「智能防隔页分页」默认开启，尽量避免常规题目跨页拆分；超长题目可跨页续排，关闭后使用紧凑连续分页。导出时核对平台分页总数，等待图片和公式加载，分类 ZIP 附带 SHA-256 `导出清单.json`。
 3. **导出不掉线、目录零冗余**：支持自选默认保存目录（默认 `Documents/CCTRExport` / 手机 `Download/CCTRExport`），PDF/ZIP 直接输出清晰命名文件，不生成空数字子目录；导出完成后保留当前登录会话与课程列表。
 4. **渲染内核自选**：桌面端支持自动优选 / Edge / Chrome / 便携 Chromium（支持一键下载）与内置 QtWebEngine 兜底。
 
