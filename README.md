@@ -61,5 +61,6 @@ android\gradlew.bat -p android testDebugUnitTest assembleDebug
 
 ## 致谢与免责声明
 
+- 桌面端创建导出任务时，会在本机 `~/.cctr_export/tasks.db` 中保存账号、密码和登录会话信息，请妥善保护该文件。
 - 本工具仅供个人学习与课程资料整理使用，请遵守所在学校与平台规范。
 - 原始桌面工具来源：[shawnsabo](https://github.com/shawnsabo)
