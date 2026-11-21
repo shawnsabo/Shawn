@@ -15,15 +15,18 @@ class Practice:
     practice_name: str
     teacher_name: str
     finish_time: str
+    question_count: Optional[int] = None
 
     @classmethod
     def from_dict(cls, d: dict) -> Practice:
         def _v(d, *keys):
-            """查找第一个存在的key"""
             for k in keys:
                 if k in d and d[k] is not None:
                     return str(d[k])
             return ""
+
+        raw_qcount = _v(d, "questioncount", "questionCount", "question_count", "studentpractisequestioncount")
+        qcount: Optional[int] = int(raw_qcount) if raw_qcount.isdigit() else None
 
         return cls(
             id=int(_v(d, "id", "ID") or "0"),
@@ -34,6 +37,7 @@ class Practice:
             practice_name=_v(d, "practicename", "practiceName", "practice_name"),
             teacher_name=_v(d, "teachernumber", "teacherNumber", "teacher_number"),
             finish_time=_v(d, "finishtime", "finishTime", "finish_time"),
+            question_count=qcount,
         )
 
     def to_dict(self) -> dict:
@@ -44,7 +48,7 @@ class Practice:
         return cls.from_dict(json.loads(s))
 
     def to_json(self) -> str:
-        return json.dumps(self.to_dict())
+        return json.dumps(self.to_dict(), ensure_ascii=False)
 
 
 @dataclasses.dataclass
@@ -119,3 +123,9 @@ class Question:
     answer: str
     has_options: bool
     options: list[Option]
+    subject_name: str = "未分类学科"
+    chapter_name: str = "未分类章节"
+    analysis_html: str = ""
+    is_choice: bool = False
+    chapter_id: str = ""
+    question_type_id: str = ""

@@ -1,0 +1,1459 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CCTR Studio · 融智云考无损导出工作台</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --sidebar: #eef1f7;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --surface-hover: #f1f5f9;
+    --border: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.14);
+    --text: #0f172a;
+    --text-2: #475569;
+    --text-3: #94a3b8;
+    --primary: #4338ca;
+    --primary-hover: #3730a3;
+    --primary-soft: rgba(67, 56, 202, 0.08);
+    --primary-border: rgba(67, 56, 202, 0.24);
+    --ok: #059669;
+    --ok-soft: #ecfdf5;
+    --ok-border: #a7f3d0;
+    --warn: #d97706;
+    --warn-soft: #fffbeb;
+    --warn-border: #fde68a;
+    --err: #dc2626;
+    --err-soft: #fef2f2;
+    --err-border: #fecaca;
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 10px 30px -12px rgba(15, 23, 42, 0.10), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    --radius-sm: 8px;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --font: "Microsoft YaHei UI", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  }
+
+  html.dark {
+    --bg: #0b0e14;
+    --sidebar: #111520;
+    --surface: #161b26;
+    --surface-2: #1c2230;
+    --surface-hover: #22293a;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #f1f5f9;
+    --text-2: #cbd5e1;
+    --text-3: #64748b;
+    --primary: #6366f1;
+    --primary-hover: #818cf8;
+    --primary-soft: rgba(99, 102, 241, 0.14);
+    --primary-border: rgba(129, 140, 248, 0.34);
+    --ok: #34d399;
+    --ok-soft: rgba(16, 185, 129, 0.12);
+    --ok-border: rgba(52, 211, 153, 0.28);
+    --warn: #fbbf24;
+    --warn-soft: rgba(245, 158, 11, 0.12);
+    --warn-border: rgba(251, 191, 36, 0.28);
+    --err: #f87171;
+    --err-soft: rgba(239, 68, 68, 0.12);
+    --err-border: rgba(248, 113, 113, 0.28);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 16px 36px -12px rgba(0, 0, 0, 0.55);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13.5px; line-height: 1.5; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  button, input, select { font-family: inherit; color: inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  .shell { display: flex; height: 100vh; width: 100vw; }
+
+  /* ── Left Rail ─────────────────────────── */
+  .rail {
+    width: 228px; min-width: 228px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 18px 14px 14px;
+    user-select: none;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 11px;
+    padding: 4px 6px 18px;
+  }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #4338ca, #6366f1);
+    color: #fff; font-weight: 800; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(67, 56, 202, 0.28);
+    flex-shrink: 0;
+  }
+  .brand-name { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+  .brand-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+  .nav-list { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; border: none; background: transparent;
+    padding: 9px 11px; border-radius: var(--radius-sm);
+    font-size: 13px; font-weight: 500; color: var(--text-2);
+    cursor: pointer; transition: all 0.14s ease; text-align: left;
+  }
+  .nav-item-left { display: flex; align-items: center; gap: 9px; }
+  .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; flex-shrink: 0; }
+  .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+  .nav-item.active {
+    background: var(--surface);
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+  }
+  .nav-item.active svg { opacity: 1; stroke: var(--primary); }
+  .nav-badge {
+    font-size: 11px; font-weight: 600;
+    padding: 1px 7px; border-radius: 999px;
+    background: var(--primary-soft); color: var(--primary);
+  }
+
+  .rail-spacer { flex: 1; }
+
+  .rail-dock { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .dock-btn {
+    width: 100%; border: 1px solid var(--border);
+    background: var(--surface); border-radius: 10px;
+    padding: 9px 11px; cursor: pointer; text-align: left;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    transition: border-color 0.14s, background 0.14s;
+  }
+  .dock-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+  .dock-main { min-width: 0; flex: 1; }
+  .dock-k { font-size: 10.5px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+  .dock-v { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .dock-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
+  .dock-dot.warn { background: var(--warn); }
+
+  .dock-row { display: flex; gap: 6px; align-items: center; }
+  .chip-mini {
+    flex: 1; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 9px; padding: 7px 10px; font-size: 12px; font-weight: 500;
+    color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.14s;
+  }
+  .chip-mini:hover { border-color: var(--border-strong); color: var(--text); }
+  .chip-mini svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+  /* ── Main Area ─────────────────────────── */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+  .topbar {
+    height: 58px; min-height: 58px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    background: var(--bg);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .page-h { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+  .session-pill {
+    display: none; align-items: center; gap: 7px;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--ok-soft); border: 1px solid var(--ok-border);
+    color: var(--ok); font-size: 12px; font-weight: 600;
+  }
+  .session-pill.show { display: inline-flex; }
+  .session-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+    padding: 8px 14px; border: 1px solid transparent;
+    cursor: pointer; transition: all 0.14s ease; white-space: nowrap;
+  }
+  .btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .btn:disabled { opacity: 0.48; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(67, 56, 202, 0.24); }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn-soft { background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: var(--shadow-sm); }
+  .btn-soft:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-2); }
+  .btn-ghost { background: transparent; color: var(--text-2); padding: 7px 11px; }
+  .btn-ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
+  .btn-danger-ghost { background: transparent; color: var(--text-3); padding: 6px 9px; font-size: 12px; }
+  .btn-danger-ghost:hover { color: var(--err); background: var(--err-soft); }
+
+  .activity-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border);
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+    cursor: pointer; transition: all 0.14s;
+  }
+  .activity-pill:hover { border-color: var(--primary-border); color: var(--primary); }
+  .activity-pill.busy { background: var(--primary-soft); border-color: var(--primary-border); color: var(--primary); }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.45); opacity: 0.5; } }
+
+  /* ── Canvas Scroll Container ───────────── */
+  .canvas { flex: 1; overflow-y: auto; padding: 26px 32px 36px; display: flex; flex-direction: column; }
+  .view { display: none; width: 100%; }
+  .view.active { display: flex; flex-direction: column; flex: 1; }
+
+  /* ── Stepper Header inside Workspace ───── */
+  .stepper {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin: 0 auto 24px;
+  }
+  .step-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 13px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; color: var(--text-3);
+    background: transparent; border: 1px solid transparent; cursor: pointer;
+    transition: all 0.14s;
+  }
+  .step-chip .num {
+    width: 20px; height: 20px; border-radius: 50%; font-size: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--border); color: var(--text-2); font-weight: 700;
+  }
+  .step-chip.active { background: var(--surface); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-sm); }
+  .step-chip.active .num { background: var(--primary); color: #fff; }
+  .step-chip.done { color: var(--ok); }
+  .step-chip.done .num { background: var(--ok-soft); color: var(--ok); }
+  .step-chip:disabled { cursor: default; opacity: 0.55; }
+  .step-line { width: 28px; height: 1px; background: var(--border-strong); }
+
+  /* ── Centered Auth Sheet ───────────────── */
+  .auth-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding-bottom: 24px; }
+  .auth-card {
+    width: 100%; max-width: 440px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 30px 30px 26px;
+    box-shadow: var(--shadow-md);
+  }
+  .auth-title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .auth-sub { font-size: 12.5px; color: var(--text-2); margin-top: 4px; margin-bottom: 22px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+  .input-box { position: relative; display: flex; align-items: center; }
+  .input {
+    width: 100%; height: 42px; padding: 0 13px;
+    border-radius: 10px; border: 1px solid var(--border-strong);
+    background: var(--surface-2); font-size: 13.5px;
+    transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
+  }
+  .input:focus { outline: none; border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .eye-btn {
+    position: absolute; right: 8px; border: none; background: transparent;
+    color: var(--text-3); cursor: pointer; padding: 5px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .eye-btn:hover { color: var(--text); background: var(--surface-hover); }
+
+  .captcha-group {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface-2); border: 1px solid var(--border-strong);
+    border-radius: 10px; padding: 4px 6px 4px 12px;
+  }
+  .captcha-group:focus-within { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .captcha-input {
+    flex: 1; min-width: 0; border: none; background: transparent;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.08em; height: 34px; outline: none;
+  }
+  .captcha-img-wrap {
+    width: 104px; height: 36px; border-radius: 7px; overflow: hidden;
+    background: #f1f5f9; border: 1px solid var(--border); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .captcha-img-wrap img { width: 100%; height: 100%; object-fit: contain; display: none; }
+  .ocr-tag { font-size: 11px; font-weight: 600; color: var(--ok); }
+  .ocr-tag.wait { color: var(--text-3); }
+
+  .banner-err {
+    display: none; margin: 12px 0 0; padding: 9px 12px; border-radius: 9px;
+    background: var(--err-soft); border: 1px solid var(--err-border);
+    color: var(--err); font-size: 12px;
+  }
+  .banner-err.show { display: block; }
+
+  /* ── Course Selection View ─────────────── */
+  .container { width: 100%; max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; flex: 1; }
+  .toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; min-width: 240px; max-width: 380px; }
+  .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--text-3); fill: none; pointer-events: none; }
+  .search-wrap input { padding-left: 34px; height: 38px; border-radius: 10px; }
+
+  .course-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px; align-content: start; margin-bottom: 20px;
+  }
+  .course-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 14px; padding: 15px 16px; cursor: pointer;
+    transition: all 0.14s ease; display: flex; align-items: flex-start; gap: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .course-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  .course-card.selected { border-color: var(--primary); background: var(--primary-soft); }
+  .check-ring {
+    width: 19px; height: 19px; border-radius: 6px; margin-top: 2px;
+    border: 1.8px solid var(--border-strong); background: var(--surface);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .course-card.selected .check-ring { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .check-ring svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.6; display: none; }
+  .course-card.selected .check-ring svg { display: block; }
+  .course-body { flex: 1; min-width: 0; }
+  .course-title { font-size: 14px; font-weight: 700; color: var(--text); word-break: break-word; }
+  .course-sub { font-size: 12px; color: var(--text-2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .course-meta { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 11.5px; color: var(--text-3); }
+  .q-pill { padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); font-weight: 600; }
+
+  .sticky-footer {
+    margin-top: auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 12px 18px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── Export Studio Split View ──────────── */
+  .studio-grid { display: grid; grid-template-columns: 1.12fr 0.88fr; gap: 20px; align-items: start; }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm);
+  }
+  .panel-title { font-size: 14.5px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+
+  .opt-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .seg-card {
+    border: 1.5px solid var(--border); background: var(--surface-2);
+    border-radius: 12px; padding: 12px; cursor: pointer; text-align: left;
+    transition: all 0.14s;
+  }
+  .seg-card:hover { border-color: var(--border-strong); }
+  .seg-card.active { border-color: var(--primary); background: var(--primary-soft); }
+  .seg-card strong { display: block; font-size: 13px; color: var(--text); }
+  .seg-card span { display: block; font-size: 11px; color: var(--text-3); margin-top: 3px; }
+  .seg-card.active strong { color: var(--primary); }
+
+  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .choice-pill {
+    border: 1px solid var(--border-strong); background: var(--surface-2);
+    padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    color: var(--text-2); cursor: pointer; transition: all 0.14s;
+  }
+  .choice-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .select {
+    width: 100%; height: 38px; padding: 0 10px;
+    border-radius: 9px; border: 1px solid var(--border-strong);
+    background: var(--surface-2); font-size: 12.5px;
+  }
+
+  .switch-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 13px; border-radius: 11px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    margin-bottom: 18px; cursor: pointer;
+  }
+  .switch-row input { width: 16px; height: 16px; accent-color: var(--primary); }
+
+  /* ── Post-Export Non-Disruptive Banner ── */
+  .result-banner {
+    display: none; margin-bottom: 18px; padding: 14px 18px;
+    border-radius: 14px; border: 1px solid var(--primary-border);
+    background: var(--surface); box-shadow: var(--shadow-sm);
+    align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .result-banner.show { display: flex; }
+  .result-banner.ok { border-color: var(--ok-border); background: var(--ok-soft); }
+  .result-banner.err { border-color: var(--err-border); background: var(--err-soft); }
+  .result-info { min-width: 0; flex: 1; }
+  .result-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
+  .result-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; word-break: break-all; }
+
+  /* ── Live A4 Paper Specimen Card ───────── */
+  .paper-stage {
+    background: #f1f5f9; border-radius: 12px; padding: 16px;
+    border: 1px solid var(--border);
+  }
+  html.dark .paper-stage { background: #0e131c; }
+  .a4-sheet {
+    background: #ffffff; color: #111827;
+    border-radius: 6px; padding: 20px 22px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+    font-size: 11.5px; line-height: 1.68;
+  }
+  .a4-h2 {
+    font-size: 12px; font-weight: 700; background: #f8fafc;
+    border-left: 3px solid #2563eb; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px;
+  }
+  .a4-qh { font-weight: 700; margin-bottom: 4px; }
+  .a4-qh span { font-weight: 400; color: #64748b; font-size: 10.5px; }
+  .a4-opt { padding: 2px 7px; border-radius: 4px; margin: 3px 0; }
+  .a4-opt.red { color: #b91c1c; font-weight: 600; background: #fef2f2; border-left: 2.5px solid #ef4444; }
+  .a4-tag {
+    display: inline-block; margin-top: 7px; padding: 1px 6px; border-radius: 4px;
+    background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; font-size: 10px; font-weight: 700;
+  }
+  .spec-list { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--text-2); }
+  .spec-item { display: flex; justify-content: space-between; gap: 10px; }
+  .spec-item strong { color: var(--text); font-weight: 600; }
+
+  /* ── History & Logs Full Views ─────────── */
+  .task-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 13px; padding: 14px 18px; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    box-shadow: var(--shadow-sm);
+  }
+  .task-left { min-width: 0; flex: 1; }
+  .task-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .task-title { font-size: 14px; font-weight: 700; color: var(--text); }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .badge.success { background: var(--ok-soft); color: var(--ok); }
+  .badge.processing { background: var(--primary-soft); color: var(--primary); }
+  .badge.waiting { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+  .badge.failed { background: var(--err-soft); color: var(--err); }
+  .task-meta { font-size: 12px; color: var(--text-3); margin-top: 4px; word-break: break-all; }
+  .task-actions { display: flex; align-items: center; gap: 8px; }
+
+  .log-console {
+    flex: 1; min-height: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 18px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.7;
+    overflow-y: auto; box-shadow: var(--shadow-sm);
+  }
+  #view-logs.active { min-height: 0; }
+  #view-logs .container { min-height: 0; height: 100%; }
+  .log-line { padding: 3px 0; border-bottom: 1px dashed var(--border); display: flex; gap: 10px; }
+  .log-line:last-child { border-bottom: none; }
+  .log-ts { color: var(--text-3); flex-shrink: 0; }
+  .log-id { color: var(--primary); font-weight: 600; flex-shrink: 0; }
+  .log-msg { color: var(--text); word-break: break-word; }
+  .log-line.error .log-msg { color: var(--err); }
+  .log-line.warn .log-msg { color: var(--warn); }
+
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 56px 24px; color: var(--text-3); text-align: center;
+    border: 1.5px dashed var(--border-strong); border-radius: 16px;
+  }
+
+  /* ── Kernel Manager Modal ──────────────── */
+  .modal-mask {
+    display: none; position: fixed; inset: 0; z-index: 90;
+    background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    width: 100%; max-width: 540px; max-height: 86vh; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; padding: 22px 24px; box-shadow: var(--shadow-md);
+  }
+  .kernel-item {
+    border: 1.5px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .kernel-item.active { border-color: var(--primary); background: var(--primary-soft); }
+  .progress-track { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 8px; display: none; }
+  .progress-track.show { display: block; }
+  .progress-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.2s; }
+
+  /* ── Slide-over Drawer ─────────────────── */
+  .drawer-mask { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, 0.25); }
+  .drawer-mask.show { display: block; }
+  .drawer {
+    position: fixed; top: 0; right: -400px; width: 380px; height: 100vh; z-index: 85;
+    background: var(--surface); border-left: 1px solid var(--border);
+    box-shadow: -12px 0 32px rgba(15, 23, 42, 0.14);
+    display: flex; flex-direction: column; padding: 18px 18px 16px;
+    transition: right 0.2s ease;
+  }
+  .drawer.show { right: 0; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(16px);
+    background: #0f172a; color: #fff; padding: 9px 18px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 500; opacity: 0; pointer-events: none;
+    transition: all 0.2s; z-index: 120; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 960px) {
+    .studio-grid { grid-template-columns: 1fr; }
+    .rail { width: 204px; min-width: 204px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- Slim Left Rail -->
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark">R</div>
+      <div>
+        <div class="brand-name">融智导出 Studio</div>
+        <div class="brand-sub">统一无损排版引擎</div>
+      </div>
+    </div>
+
+    <nav class="nav-list" aria-label="主导航">
+      <button class="nav-item active" data-view="workspace" onclick="switchView('workspace')">
+        <span class="nav-item-left">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          导出工作台
+        </span>
+      </button>
+      <button class="nav-item" data-view="history" onclick="switchView('history')">
+        <span class="nav-item-left">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          导出记录
+        </span>
+        <span class="nav-badge" id="navTaskBadge" style="display:none">0</span>
+      </button>
+      <button class="nav-item" data-view="logs" onclick="switchView('logs')">
+        <span class="nav-item-left">
+          <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          校验日志
+        </span>
+      </button>
+    </nav>
+
+    <div class="rail-spacer"></div>
+
+    <div class="rail-dock">
+      <button class="dock-btn" onclick="chooseExportDir()" title="点击更改默认导出位置">
+        <div class="dock-main">
+          <div class="dock-k">默认保存到 <span style="color:var(--primary)">更改</span></div>
+          <div class="dock-v" id="exportDirLabel">Documents/CCTRExport</div>
+        </div>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </button>
+
+      <button class="dock-btn" onclick="openKernelModal()" title="切换或自动下载 Edge / Chrome / Chromium 渲染内核">
+        <div class="dock-main">
+          <div class="dock-k">PDF 渲染内核</div>
+          <div class="dock-v" id="kernelDockLabel">检测中…</div>
+        </div>
+        <span class="dock-dot" id="kernelDockDot"></span>
+      </button>
+
+      <div class="dock-row">
+        <button class="chip-mini" onclick="toggleTheme()" id="themeBtn">
+          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          深色
+        </button>
+        <button class="chip-mini" onclick="bridge && bridge.openExportDir()">
+          <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          目录
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Workspace -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-h" id="pageTitle">导出工作台</h1>
+        <div class="session-pill" id="sessionPill">
+          <span class="session-dot"></span>
+          <span id="sessionLabel">已连接</span>
+        </div>
+        <button class="btn btn-ghost" id="switchAccBtn" style="display:none;font-size:12px;" onclick="signOut()">切换账号</button>
+      </div>
+      <div class="topbar-right">
+        <button class="activity-pill" id="activityPill" onclick="toggleDrawer(true)">
+          <span id="activityDot" class="session-dot" style="background:var(--text-3)"></span>
+          <span id="activityLabel">暂无活动任务</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="canvas" id="mainCanvas">
+      <!-- View 1: Workspace -->
+      <section class="view active" id="view-workspace">
+        <div class="stepper" id="stepper">
+          <button class="step-chip active" id="stepChip0" onclick="tryGoStep(0)">
+            <span class="num">1</span> 连接账号
+          </button>
+          <span class="step-line"></span>
+          <button class="step-chip" id="stepChip1" onclick="tryGoStep(1)" disabled>
+            <span class="num">2</span> 选择练习
+          </button>
+          <span class="step-line"></span>
+          <button class="step-chip" id="stepChip2" onclick="tryGoStep(2)" disabled>
+            <span class="num">3</span> 排版与导出
+          </button>
+        </div>
+
+        <!-- Step 0: Calm Sign-In -->
+        <div class="auth-wrap" id="paneStep0">
+          <div class="auth-card">
+            <div class="auth-title">连接融智云考账号</div>
+            <div class="auth-sub">本地直连拉取题库，验证码自动识别，导出期间保持登录不掉线。</div>
+
+            <div class="field">
+              <label for="schoolInput">学校代码</label>
+              <input class="input" id="schoolInput" placeholder="例如 u101441" autocomplete="organization">
+            </div>
+            <div class="field">
+              <label for="userInput">学号 / 账号</label>
+              <input class="input" id="userInput" placeholder="输入学号或登录账号" autocomplete="username">
+            </div>
+            <div class="field">
+              <label for="passInput">密码</label>
+              <div class="input-box">
+                <input class="input" id="passInput" type="password" placeholder="输入登录密码" style="padding-right:38px" autocomplete="current-password">
+                <button type="button" class="eye-btn" onclick="togglePassword()" aria-label="显示或隐藏密码">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="field" style="margin-bottom:20px;">
+              <label for="captchaInput">
+                <span>图形验证码</span>
+                <span class="ocr-tag wait" id="ocrStatusTag">等待加载…</span>
+              </label>
+              <div class="captcha-group">
+                <input class="captcha-input" id="captchaInput" placeholder="自动填入或手动输入">
+                <div class="captcha-img-wrap" onclick="refreshCaptcha()" title="点击刷新验证码并重新识别">
+                  <img id="captchaImg" alt="图形验证码">
+                  <span id="captchaPlaceholder" style="font-size:11px;color:#64748b;">加载中</span>
+                </div>
+              </div>
+            </div>
+
+            <button class="btn btn-primary" id="loginBtn" style="width:100%;height:42px;font-size:14px;" onclick="submitLogin()">
+              登录并获取课程练习
+            </button>
+            <div class="banner-err" id="loginErr"></div>
+          </div>
+        </div>
+
+        <!-- Step 1: Course & Practice Picker -->
+        <div class="container" id="paneStep1" style="display:none;">
+          <div class="toolbar-row">
+            <div class="search-wrap">
+              <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="input" id="courseSearch" placeholder="按课程名称、练习名称或教师筛选…" oninput="renderPracticeGrid()">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-soft" onclick="selectAllPractices(true)">全选当前</button>
+              <button class="btn btn-soft" onclick="selectAllPractices(false)">清空选择</button>
+              <button class="btn btn-ghost" onclick="refreshPractices()">刷新列表</button>
+            </div>
+          </div>
+
+          <div class="course-grid" id="practiceGrid"></div>
+
+          <div class="sticky-footer">
+            <div style="font-size:13px;color:var(--text-2);" id="selectedSummary">请选择至少一项课程练习</div>
+            <button class="btn btn-primary" id="toStep2Btn" disabled onclick="goStep(2)">
+              下一步：排版与导出 →
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 2: Export Studio (No Auto-Reset!) -->
+        <div class="container" id="paneStep2" style="display:none;">
+          <div class="result-banner" id="resultBanner">
+            <div class="result-info">
+              <div class="result-title" id="resultTitle">正在准备导出…</div>
+              <div class="result-sub" id="resultSub">完成后会保留当前登录与选课状态，可直接切换格式再次导出。</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;" id="resultActions"></div>
+          </div>
+
+          <div class="studio-grid">
+            <div class="panel">
+              <div class="panel-title">
+                <span>导出格式与范围设置</span>
+                <span style="font-size:12px;font-weight:500;color:var(--text-2);" id="studioScopeBadge"></span>
+              </div>
+
+              <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">导出形式</div>
+              <div class="opt-grid-3">
+                <button class="seg-card active" data-fmt="pdf" onclick="setFormat('pdf')">
+                  <strong>A4 合并 PDF</strong>
+                  <span>全量整洁合集</span>
+                </button>
+                <button class="seg-card" data-fmt="zip" onclick="setFormat('zip')">
+                  <strong>分类 ZIP 归档</strong>
+                  <span>分卷 + 校验清单</span>
+                </button>
+                <button class="seg-card" data-fmt="img" onclick="setFormat('img')">
+                  <strong>高清 PNG 图包</strong>
+                  <span>逐题截图打包</span>
+                </button>
+              </div>
+
+              <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">答案展示方式</div>
+              <div class="pill-row">
+                <button class="choice-pill active" data-var="withAnswersRed" onclick="setVariant('withAnswersRed')">红标答案与解析</button>
+                <button class="choice-pill" data-var="withAnswersPlain" onclick="setVariant('withAnswersPlain')">普通黑字答案</button>
+                <button class="choice-pill" data-var="withoutAnswers" onclick="setVariant('withoutAnswers')">纯题面刷题版</button>
+              </div>
+
+              <div id="singleFiltersWrap" style="display:none;">
+                <div class="filter-grid">
+                  <div>
+                    <label style="display:block;font-size:11.5px;color:var(--text-2);margin-bottom:5px;">按章节过滤</label>
+                    <select class="select" id="chapterSel"><option value="">全部章节</option></select>
+                  </div>
+                  <div>
+                    <label style="display:block;font-size:11.5px;color:var(--text-2);margin-bottom:5px;">按题型过滤</label>
+                    <select class="select" id="qtypeSel"><option value="">全部题型</option></select>
+                  </div>
+                </div>
+              </div>
+
+              <label class="switch-row">
+                <div>
+                  <div style="font-size:13px;font-weight:600;">智能防隔页分页（推荐）</div>
+                  <div style="font-size:11.5px;color:var(--text-3);">小题整题不跨页拆散；超长单题页内接续，下题另起一页</div>
+                </div>
+                <input type="checkbox" id="smartPagination" checked onchange="updatePreviewCard()">
+              </label>
+
+              <label class="switch-row">
+                <div>
+                  <div style="font-size:13px;font-weight:600;">仅导出已练习题目</div>
+                  <div style="font-size:11.5px;color:var(--text-3);">关闭时将同时拉取未练与已练全部题目并核对总数</div>
+                </div>
+                <input type="checkbox" id="practicedOnly">
+              </label>
+
+              <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;">
+                <button class="btn btn-soft" onclick="goStep(1)">← 修改所选练习</button>
+                <button class="btn btn-primary" style="min-width:168px;height:40px;" id="exportBtn" onclick="submitExport()">
+                  开始无损导出
+                </button>
+              </div>
+            </div>
+
+            <!-- Live A4 Preview Card -->
+            <div class="panel">
+              <div class="panel-title">
+                <span>A4 排版预览</span>
+                <span style="font-size:11px;font-weight:600;color:var(--ok);">字号公式等比已开启</span>
+              </div>
+              <div class="paper-stage">
+                <div class="a4-sheet">
+                  <div class="a4-h2">示例课程 / 导论与计算</div>
+                  <div class="a4-qh">第 1 题 <span>(2683548)</span></div>
+                  <div>某系统矢量场公式 <em>E</em> 与正文字号保持严格一致的 10.5pt 视觉比例：</div>
+                  <div class="a4-opt" id="prevOptA">A. 忽略公式放大直接截图</div>
+                  <div class="a4-opt red" id="prevOptB">B. 统一正文字号并等比缩放高分公式图</div>
+                  <div id="prevAnswerBlock">
+                    <span class="a4-tag">答案</span>
+                    <div style="margin-top:3px;color:#334155;">B · 附自动对齐解析与零裁剪图片校验</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="spec-list">
+                <div class="spec-item"><span>纸张与留白</span><strong>标准 A4 · 四周 18mm</strong></div>
+                <div class="spec-item"><span>防隔页分页</span><strong id="studioPagSpec">已开启 · 小题整题不跨页</strong></div>
+                <div class="spec-item"><span>保存目录</span><strong id="studioOutDir" style="max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Documents/CCTRExport</strong></div>
+                <div class="spec-item"><span>目录整洁策略</span><strong>直接输出成品文件，无空子目录</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 2: History & Files -->
+      <section class="view" id="view-history">
+        <div class="container">
+          <div class="toolbar-row">
+            <div style="font-size:13px;color:var(--text-2);" id="historySummary">已保存的全部导出文件记录</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-soft" onclick="bridge && bridge.openExportDir()">打开导出文件夹</button>
+            </div>
+          </div>
+          <div id="historyList"></div>
+        </div>
+      </section>
+
+      <!-- View 3: Full Logs (Zero Jump-To-Top!) -->
+      <section class="view" id="view-logs">
+        <div class="container" style="flex:1;">
+          <div class="toolbar-row">
+            <div style="font-size:13px;color:var(--text-2);">实时完整性校验、分页核对与内核调度日志</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-soft" onclick="copyLogs()">复制日志</button>
+              <button class="btn btn-soft" onclick="clearLogs()">清空日志</button>
+            </div>
+          </div>
+          <div class="log-console" id="fullLogBox"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- Activity Slide-over Drawer -->
+<div class="drawer-mask" id="drawerMask" onclick="toggleDrawer(false)"></div>
+<aside class="drawer" id="activityDrawer">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+    <strong style="font-size:15px;">最近任务与日志</strong>
+    <button class="btn btn-ghost" onclick="toggleDrawer(false)">关闭</button>
+  </div>
+  <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">最近导出</div>
+  <div id="drawerTasks" style="max-height:46%;overflow-y:auto;margin-bottom:14px;"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:12px;font-weight:600;color:var(--text-2);">最新日志</span>
+    <button class="btn btn-ghost" style="font-size:11.5px;padding:3px 7px;" onclick="toggleDrawer(false);switchView('logs')">查看完整日志</button>
+  </div>
+  <div class="log-console" id="drawerLogBox" style="min-height:140px;font-size:11.5px;padding:10px 12px;"></div>
+</aside>
+
+<!-- Kernel Manager Modal -->
+<div class="modal-mask" id="kernelModal" onclick="if(event.target===this)closeKernelModal()">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <strong style="font-size:16px;">PDF / 图片渲染内核设置</strong>
+      <button class="btn btn-ghost" onclick="closeKernelModal()">关闭</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--text-2);margin-bottom:16px;">
+      优先复用系统已安装的 Edge / Chrome，也可一键自动下载便携 Chromium。
+    </div>
+    <div id="kernelList"></div>
+    <div class="progress-track" id="kernelProgTrack"><div class="progress-fill" id="kernelProgFill"></div></div>
+    <div id="kernelProgMsg" style="font-size:12px;color:var(--text-2);margin-top:6px;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+      <button class="btn btn-soft" onclick="detectKernels()">重新检测本机</button>
+      <button class="btn btn-primary" id="dlKernelBtn" onclick="downloadKernel()">安装/下载所选内核</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let bridge = null;
+let currentView = 'workspace';
+let currentStep = 0;
+let isLoggedIn = false;
+let sessionAccount = null; // { school, username, password }
+let practices = [];
+let selectedIds = new Set();
+let exportFmt = 'pdf';
+let exportVariant = 'withAnswersRed';
+let kernelsState = { preferred: 'auto', labels: [], items: {} };
+let tasksCache = [];
+let logsCache = [];
+let activeTaskId = null;
+let lastTasksSig = '';
+let lastLogsSig = '';
+
+const qs = id => document.getElementById(id);
+
+function showToast(msg) {
+  const t = qs('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function shortPathLabel(p) {
+  if (!p) return 'Documents/CCTRExport';
+  const parts = String(p).replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts.length >= 2 ? parts.slice(-2).join('/') : p;
+}
+
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', !!dark);
+  qs('themeBtn').innerHTML = dark
+    ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/></svg>浅色'
+    : '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>深色';
+}
+
+function toggleTheme() {
+  const dark = !document.documentElement.classList.contains('dark');
+  applyTheme(dark);
+  if (bridge) bridge.setDarkMode(dark);
+}
+
+function togglePassword() {
+  const inp = qs('passInput');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
+  const titles = { workspace: '导出工作台', history: '导出记录与文件', logs: '完整性校验日志' };
+  qs('pageTitle').textContent = titles[view] || '导出工作台';
+}
+
+function toggleDrawer(show) {
+  qs('drawerMask').classList.toggle('show', !!show);
+  qs('activityDrawer').classList.toggle('show', !!show);
+}
+
+function tryGoStep(step) {
+  if (step > 0 && !isLoggedIn) return;
+  if (step === 2 && selectedIds.size === 0) return;
+  goStep(step);
+}
+
+function goStep(step) {
+  currentStep = step;
+  qs('paneStep0').style.display = step === 0 ? 'flex' : 'none';
+  qs('paneStep1').style.display = step === 1 ? 'flex' : 'none';
+  qs('paneStep2').style.display = step === 2 ? 'flex' : 'none';
+
+  [0, 1, 2].forEach(i => {
+    const chip = qs('stepChip' + i);
+    chip.classList.toggle('active', i === step);
+    chip.classList.toggle('done', i < step || (i === 0 && isLoggedIn && step > 0));
+    if (i === 1) chip.disabled = !isLoggedIn;
+    if (i === 2) chip.disabled = !isLoggedIn || selectedIds.size === 0;
+  });
+
+  if (step === 2) {
+    qs('studioScopeBadge').textContent = `已选 ${selectedIds.size} 项练习`;
+    loadFiltersIfSingle();
+    updatePreviewCard();
+  }
+}
+
+/* ── Captcha & Auth ────────────────────── */
+function refreshCaptcha() {
+  if (!bridge) return;
+  qs('ocrStatusTag').textContent = '识别中…';
+  qs('ocrStatusTag').className = 'ocr-tag wait';
+  qs('captchaPlaceholder').style.display = 'inline';
+  qs('captchaImg').style.display = 'none';
+  bridge.fetchCaptcha();
+}
+
+function submitLogin() {
+  if (!bridge) return;
+  const school = qs('schoolInput').value.trim();
+  const user = qs('userInput').value.trim();
+  const pass = qs('passInput').value;
+  const captcha = qs('captchaInput').value.trim();
+  const err = qs('loginErr');
+  err.classList.remove('show');
+  if (!school || !user || !pass) {
+    err.textContent = '请填写学校代码、学号与密码';
+    err.classList.add('show');
+    return;
+  }
+  const btn = qs('loginBtn');
+  btn.disabled = true;
+  btn.textContent = '正在连接并校验练习列表…';
+  sessionAccount = { school, username: user, password: pass };
+  bridge.login(school, user, pass, captcha, true);
+}
+
+function signOut() {
+  if (bridge) bridge.resetSession();
+  isLoggedIn = false;
+  practices = [];
+  selectedIds.clear();
+  activeTaskId = null;
+  qs('resultBanner').classList.remove('show', 'ok', 'err');
+  qs('sessionPill').classList.remove('show');
+  qs('switchAccBtn').style.display = 'none';
+  qs('passInput').value = '';
+  qs('captchaInput').value = '';
+  goStep(0);
+  refreshCaptcha();
+  showToast('已安全退出当前账号');
+}
+
+/* ── Practices Grid ────────────────────── */
+function renderPracticeGrid() {
+  const kw = qs('courseSearch').value.trim().toLowerCase();
+  const list = practices.filter(p => !kw ||
+    (p.lesson_name || '').toLowerCase().includes(kw) ||
+    (p.practice_name || '').toLowerCase().includes(kw) ||
+    (p.teacher_name || '').toLowerCase().includes(kw)
+  );
+  const grid = qs('practiceGrid');
+  if (!list.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">没有匹配的课程练习</div>';
+  } else {
+    grid.innerHTML = list.map(p => {
+      const sel = selectedIds.has(String(p.id));
+      const cnt = p.question_count != null ? `${p.question_count} 题` : '待统计';
+      return `
+        <div class="course-card ${sel ? 'selected' : ''}" onclick="togglePractice('${escapeHtml(p.id)}')">
+          <div class="check-ring"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="course-body">
+            <div class="course-title">${escapeHtml(p.lesson_name || p.practice_name)}</div>
+            <div class="course-sub">${escapeHtml(p.practice_name)}</div>
+            <div class="course-meta">
+              <span class="q-pill">${cnt}</span>
+              ${p.teacher_name ? `<span>${escapeHtml(p.teacher_name)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  updateSelectedSummary();
+}
+
+function togglePractice(id) {
+  id = String(id);
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  renderPracticeGrid();
+}
+
+function selectAllPractices(flag) {
+  const kw = qs('courseSearch').value.trim().toLowerCase();
+  const visible = practices.filter(p => !kw ||
+    (p.lesson_name || '').toLowerCase().includes(kw) ||
+    (p.practice_name || '').toLowerCase().includes(kw) ||
+    (p.teacher_name || '').toLowerCase().includes(kw)
+  );
+  visible.forEach(p => {
+    if (flag) selectedIds.add(String(p.id));
+    else selectedIds.delete(String(p.id));
+  });
+  renderPracticeGrid();
+}
+
+function updateSelectedSummary() {
+  const chosen = practices.filter(p => selectedIds.has(String(p.id)));
+  const totalQ = chosen.reduce((acc, p) => acc + (Number(p.question_count) || 0), 0);
+  qs('selectedSummary').textContent = chosen.length
+    ? `已选 ${chosen.length} 项练习（约 ${totalQ} 道题）`
+    : '请选择至少一项课程练习';
+  qs('toStep2Btn').disabled = chosen.length === 0;
+  qs('stepChip2').disabled = chosen.length === 0;
+}
+
+function refreshPractices() {
+  if (!sessionAccount || !bridge) return;
+  showToast('正在刷新课程练习列表…');
+  bridge.login(sessionAccount.school, sessionAccount.username, sessionAccount.password, '', true);
+}
+
+/* ── Export Studio ─────────────────────── */
+function setFormat(fmt) {
+  exportFmt = fmt;
+  document.querySelectorAll('.seg-card').forEach(c => c.classList.toggle('active', c.dataset.fmt === fmt));
+}
+
+function setVariant(v) {
+  exportVariant = v;
+  document.querySelectorAll('.choice-pill').forEach(p => p.classList.toggle('active', p.dataset.var === v));
+  updatePreviewCard();
+}
+
+function updatePreviewCard() {
+  const optB = qs('prevOptB');
+  const ans = qs('prevAnswerBlock');
+  optB.classList.toggle('red', exportVariant === 'withAnswersRed');
+  ans.style.display = exportVariant === 'withoutAnswers' ? 'none' : 'block';
+  const pagEl = qs('studioPagSpec');
+  if (pagEl) {
+    const on = qs('smartPagination') ? qs('smartPagination').checked : true;
+    pagEl.textContent = on ? '已开启 · 小题整题不跨页' : '已关闭 · 紧凑连续分页';
+  }
+}
+
+function loadFiltersIfSingle() {
+  const wrap = qs('singleFiltersWrap');
+  const cSel = qs('chapterSel');
+  const qSel = qs('qtypeSel');
+  cSel.innerHTML = '<option value="">全部章节</option>';
+  qSel.innerHTML = '<option value="">全部题型</option>';
+  if (selectedIds.size !== 1 || !bridge) {
+    wrap.style.display = 'none';
+    return;
+  }
+  const pid = Array.from(selectedIds)[0];
+  const item = practices.find(p => String(p.id) === pid);
+  if (!item) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  bridge.loadFilters(item.json);
+}
+
+function submitExport() {
+  if (!bridge) return;
+  const chosen = practices.filter(p => selectedIds.has(String(p.id)));
+  if (!chosen.length) return showToast('请先选择练习');
+
+  const chVal = qs('chapterSel').value;
+  const qtVal = qs('qtypeSel').value;
+  const payload = {
+    format: exportFmt,
+    variant: exportVariant,
+    practicedOnly: qs('practicedOnly').checked,
+    smartPagination: qs('smartPagination').checked,
+    practices: chosen.map(p => p.json),
+    chapters: chVal ? [JSON.parse(chVal)] : [],
+    questionTypes: qtVal ? [JSON.parse(qtVal)] : [],
+  };
+  bridge.submitExport(JSON.stringify(payload), resStr => {
+    const res = JSON.parse(resStr);
+    if (!res.ok) {
+      showToast(res.error || '提交失败');
+      return;
+    }
+    // 关键改进：绝不退出登录、绝不跳回第一步、绝不清空已选课程！
+    activeTaskId = res.taskId;
+    renderResultBanner();
+    showToast(`任务 #${res.taskId} 已开始导出，请稍候…`);
+  });
+}
+
+function renderResultBanner() {
+  const banner = qs('resultBanner');
+  if (!activeTaskId) { banner.classList.remove('show'); return; }
+  const t = tasksCache.find(x => x.id === activeTaskId);
+  if (!t) return;
+  banner.classList.add('show');
+  banner.classList.remove('ok', 'err');
+  const titleEl = qs('resultTitle');
+  const subEl = qs('resultSub');
+  const actEl = qs('resultActions');
+
+  if (t.status === 'success') {
+    banner.classList.add('ok');
+    titleEl.textContent = `✓ 已完成导出：${t.file_name || t.title}`;
+    subEl.textContent = `${t.file_size ? t.file_size + ' · ' : ''}当前仍保持已登录状态，您可以直接更改格式或返回重新选课。`;
+    actEl.innerHTML = `
+      <button class="btn btn-primary" onclick="bridge.openTaskFile(${t.id})">打开文件</button>
+      <button class="btn btn-soft" onclick="bridge.openTaskDir(${t.id})">在文件夹中显示</button>
+    `;
+  } else if (t.status === 'failed') {
+    banner.classList.add('err');
+    titleEl.textContent = `✕ 任务 #${t.id} 导出失败`;
+    subEl.textContent = '请查看校验日志定位具体原因，或切换渲染内核后重试。';
+    actEl.innerHTML = `<button class="btn btn-soft" onclick="switchView('logs')">查看校验日志</button>`;
+  } else {
+    titleEl.textContent = `⏳ 正在后台生成：${t.title}`;
+    subEl.textContent = '正在核对题目总数、等比缩放公式截图并生成 A4 排版…';
+    actEl.innerHTML = `<button class="btn btn-soft" onclick="toggleDrawer(true)">查看进度</button>`;
+  }
+}
+
+/* ── Folder & Kernel Settings ──────────── */
+function applyExportDirUI(dir) {
+  const short = shortPathLabel(dir);
+  qs('exportDirLabel').textContent = short;
+  qs('studioOutDir').textContent = dir || 'Documents/CCTRExport';
+  qs('studioOutDir').title = dir || '';
+}
+
+function chooseExportDir() {
+  if (!bridge) return;
+  bridge.chooseExportDir(resStr => {
+    const res = JSON.parse(resStr);
+    if (res.ok && res.exportDir) {
+      applyExportDirUI(res.exportDir);
+      showToast('已更新默认导出目录');
+    }
+  });
+}
+
+function applyKernelState(k) {
+  kernelsState = k || kernelsState;
+  const pref = kernelsState.preferred || 'auto';
+  const item = (kernelsState.items || {})[pref] || (kernelsState.items || {}).auto || {};
+  qs('kernelDockLabel').textContent = item.name ? `${item.name}${item.version ? ' ' + item.version.split('.')[0] : ''}` : '自动优选';
+  qs('kernelDockDot').classList.toggle('warn', !item.installed);
+  renderKernelModalList();
+}
+
+function openKernelModal() {
+  renderKernelModalList();
+  qs('kernelModal').classList.add('show');
+}
+function closeKernelModal() { qs('kernelModal').classList.remove('show'); }
+
+function renderKernelModalList() {
+  const list = qs('kernelList');
+  if (!list) return;
+  const labels = kernelsState.labels || [];
+  const items = kernelsState.items || {};
+  const pref = kernelsState.preferred || 'auto';
+  list.innerHTML = labels.map(l => {
+    const info = items[l.key] || {};
+    const statusText = info.installed
+      ? `<span style="color:var(--ok);font-weight:600;">已就绪${info.version ? ' · ' + escapeHtml(info.version) : ''}</span>`
+      : `<span style="color:var(--warn);font-weight:600;">未安装${info.can_download ? '（支持自动下载）' : ''}</span>`;
+    return `
+      <div class="kernel-item ${pref === l.key ? 'active' : ''}" onclick="selectKernel('${l.key}')">
+        <div>
+          <div style="font-weight:600;font-size:13px;">${escapeHtml(l.label)}</div>
+          <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">${escapeHtml(info.path || info.source || '')}</div>
+        </div>
+        <div style="font-size:12px;white-space:nowrap;">${statusText}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function selectKernel(kind) {
+  if (!bridge) return;
+  bridge.selectKernel(kind, resStr => {
+    applyKernelState(JSON.parse(resStr));
+    showToast('已切换渲染内核策略');
+  });
+}
+function detectKernels() {
+  if (!bridge) return;
+  bridge.detectKernels(resStr => {
+    applyKernelState(JSON.parse(resStr));
+    showToast('本机内核检测完成');
+  });
+}
+function downloadKernel() {
+  if (!bridge) return;
+  qs('dlKernelBtn').disabled = true;
+  qs('kernelProgTrack').classList.add('show');
+  bridge.downloadKernel(kernelsState.preferred || 'chromium');
+}
+
+/* ── State Sync (Zero Flicker & Smart Scroll!) ─ */
+function renderStatePayload(data) {
+  tasksCache = data.tasks || [];
+  logsCache = data.logs || [];
+
+  const tasksSig = JSON.stringify(tasksCache);
+  if (tasksSig !== lastTasksSig) {
+    lastTasksSig = tasksSig;
+    renderTasksUI();
+    renderResultBanner();
+  }
+
+  const logsSig = `${logsCache.length}:${logsCache.length ? logsCache[logsCache.length - 1].id : 0}`;
+  if (logsSig !== lastLogsSig) {
+    lastLogsSig = logsSig;
+    renderLogsUI();
+  }
+}
+
+function renderTasksUI() {
+  const busy = tasksCache.filter(t => t.status === 'processing' || t.status === 'waiting').length;
+  const badge = qs('navTaskBadge');
+  badge.style.display = tasksCache.length ? 'inline-block' : 'none';
+  badge.textContent = String(tasksCache.length);
+
+  const pill = qs('activityPill');
+  pill.classList.toggle('busy', busy > 0);
+  if (busy > 0) {
+    qs('activityDot').className = 'pulse';
+    qs('activityLabel').textContent = `正在导出 (${busy})`;
+  } else if (tasksCache.length) {
+    qs('activityDot').className = 'session-dot';
+    qs('activityDot').style.background = tasksCache[0].status === 'success' ? 'var(--ok)' : 'var(--err)';
+    qs('activityLabel').textContent = `最近：${tasksCache[0].file_name || tasksCache[0].title}`;
+  } else {
+    qs('activityDot').className = 'session-dot';
+    qs('activityDot').style.background = 'var(--text-3)';
+    qs('activityLabel').textContent = '暂无活动任务';
+  }
+
+  const fmtNames = { pdf: '合并 PDF', zip: '分类 ZIP', img: 'PNG 图包' };
+  const statusLabels = { success: '已完成', processing: '导出中', waiting: '队列中', failed: '失败' };
+  qs('historySummary').textContent = tasksCache.length
+    ? `共 ${tasksCache.length} 条记录（导出文件保存在您设定的文件夹中）`
+    : '暂无导出记录';
+
+  const histBox = qs('historyList');
+  if (!tasksCache.length) {
+    histBox.innerHTML = '<div class="empty-state">还没有导出记录，在“导出工作台”提交任务后会显示在这里。</div>';
+  } else {
+    histBox.innerHTML = tasksCache.map(t => `
+      <div class="task-row">
+        <div class="task-left">
+          <div class="task-head">
+            <span class="task-title">${escapeHtml(t.file_name || t.title)}</span>
+            <span class="badge ${t.status}">${statusLabels[t.status] || t.status}</span>
+            <span style="font-size:11.5px;color:var(--text-2);">${fmtNames[t.export_type] || t.export_type}</span>
+          </div>
+          <div class="task-meta">
+            ${escapeHtml(t.create_time)}${t.file_size ? ' · ' + escapeHtml(t.file_size) : ''}${t.file_path ? ' · ' + escapeHtml(t.file_path) : ''}
+          </div>
+        </div>
+        <div class="task-actions">
+          ${t.status === 'success' ? `
+            <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;" onclick="bridge.openTaskFile(${t.id})">打开文件</button>
+            <button class="btn btn-soft" style="padding:6px 12px;font-size:12px;" onclick="bridge.openTaskDir(${t.id})">定位文件夹</button>
+          ` : ''}
+          ${t.status === 'failed' ? `<button class="btn btn-soft" style="padding:6px 12px;font-size:12px;" onclick="bridge.runTask(${t.id})">重试</button>` : ''}
+          <button class="btn btn-danger-ghost" onclick="bridge.deleteTask(${t.id})">移除记录</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const dBox = qs('drawerTasks');
+  dBox.innerHTML = tasksCache.slice(0, 6).map(t => `
+    <div style="padding:9px 11px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+        <span style="font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)}</span>
+        <span class="badge ${t.status}">${statusLabels[t.status] || t.status}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:3px;">${escapeHtml(t.create_time)}${t.file_size ? ' · ' + t.file_size : ''}</div>
+    </div>
+  `).join('') || '<div style="font-size:12px;color:var(--text-3);">暂无最近任务</div>';
+}
+
+function renderLogsUI() {
+  const html = logsCache.map(l => {
+    const ts = (l.create_time || '').slice(11, 19);
+    return `<div class="log-line ${escapeHtml(l.level)}"><span class="log-ts">[${escapeHtml(ts)}]</span><span class="log-id">#${l.task_id}</span><span class="log-msg">${escapeHtml(l.message)}</span></div>`;
+  }).join('') || '<div style="color:var(--text-3);">暂无运行日志</div>';
+
+  // Smart scroll preservation: NEVER jump to top/bottom when user is scrolling history!
+  ['fullLogBox', 'drawerLogBox'].forEach(boxId => {
+    const el = qs(boxId);
+    if (!el) return;
+    const prevTop = el.scrollTop;
+    const wasAtBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+    el.innerHTML = html;
+    if (wasAtBottom) el.scrollTop = el.scrollHeight;
+    else el.scrollTop = prevTop;
+  });
+}
+
+function copyLogs() {
+  const text = logsCache.map(l => `[${(l.create_time || '').slice(11, 19)}] #${l.task_id} [${l.level}] ${l.message}`).join('\n');
+  navigator.clipboard.writeText(text).then(() => showToast('已复制全部日志'));
+}
+
+function clearLogs() {
+  if (bridge) bridge.clearLogs();
+  showToast('已清空日志');
+}
+
+/* ── Keyboard & QtWebChannel Init ──────── */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeKernelModal(); toggleDrawer(false); }
+  if (e.key === 'Enter' && currentView === 'workspace' && currentStep === 0 && !qs('loginBtn').disabled) {
+    submitLogin();
+  }
+});
+
+function initBridge() {
+  if (typeof QWebChannel === 'undefined' || typeof qt === 'undefined') {
+    setTimeout(initBridge, 50);
+    return;
+  }
+  new QWebChannel(qt.webChannelTransport, channel => {
+    bridge = channel.objects.cctrBridge;
+
+    bridge.getInitialState(raw => {
+      const state = JSON.parse(raw);
+      applyTheme(state.darkMode);
+      applyExportDirUI(state.exportDir);
+      applyKernelState(state.kernels);
+      renderStatePayload(state);
+      refreshCaptcha();
+    });
+
+    bridge.captchaReady.connect(raw => {
+      const res = JSON.parse(raw);
+      const imgUri = res.imageDataUri || res.image || '';
+      const ocrCode = res.code || res.ocr || '';
+      if (res.ok && imgUri) {
+        qs('captchaImg').src = imgUri;
+        qs('captchaImg').style.display = 'block';
+        qs('captchaPlaceholder').style.display = 'none';
+        if (ocrCode) {
+          qs('captchaInput').value = ocrCode;
+          qs('ocrStatusTag').textContent = `已自动识别 (${ocrCode})`;
+          qs('ocrStatusTag').className = 'ocr-tag';
+        } else {
+          qs('captchaInput').value = '';
+          qs('ocrStatusTag').textContent = res.ocrAvailable ? '请手动输入' : '需手动输入';
+          qs('ocrStatusTag').className = 'ocr-tag wait';
+        }
+      } else {
+        qs('captchaPlaceholder').style.display = 'inline';
+        qs('captchaPlaceholder').textContent = '获取失败';
+        qs('ocrStatusTag').textContent = res.error ? '点击重试' : '点击图片重试';
+        qs('ocrStatusTag').className = 'ocr-tag wait';
+      }
+    });
+
+    bridge.loginDone.connect(raw => {
+      const res = JSON.parse(raw);
+      const btn = qs('loginBtn');
+      btn.disabled = false;
+      btn.textContent = '登录并获取课程练习';
+      if (!res.ok) {
+        qs('loginErr').textContent = res.error || '登录失败';
+        qs('loginErr').classList.add('show');
+        refreshCaptcha();
+        return;
+      }
+      isLoggedIn = true;
+      practices = res.practices || [];
+      const validIds = new Set(practices.map(p => String(p.id)));
+      selectedIds = new Set(Array.from(selectedIds).filter(id => validIds.has(id)));
+      qs('sessionPill').classList.add('show');
+      qs('sessionLabel').textContent = `${sessionAccount.school} · ${sessionAccount.username}`;
+      qs('switchAccBtn').style.display = 'inline-flex';
+      renderPracticeGrid();
+      goStep(1);
+      showToast(`连接成功，共载入 ${practices.length} 项练习`);
+    });
+
+    bridge.filtersReady.connect(raw => {
+      const res = JSON.parse(raw);
+      const cSel = qs('chapterSel');
+      const qSel = qs('qtypeSel');
+      (res.chapters || []).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(c);
+        opt.textContent = c.name || '未命名章节';
+        cSel.appendChild(opt);
+      });
+      (res.question_types || []).forEach(q => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(q);
+        opt.textContent = q.name || '未命名题型';
+        qSel.appendChild(opt);
+      });
+    });
+
+    bridge.stateChanged.connect(raw => renderStatePayload(JSON.parse(raw)));
+
+    bridge.kernelProgress.connect((pct, msg) => {
+      qs('kernelProgFill').style.width = `${pct}%`;
+      qs('kernelProgMsg').textContent = msg;
+    });
+
+    bridge.kernelDone.connect(raw => {
+      qs('dlKernelBtn').disabled = false;
+      const res = JSON.parse(raw);
+      if (res.kernels) applyKernelState(res.kernels);
+      qs('kernelProgMsg').textContent = res.ok ? res.message : (res.error || '安装失败');
+      if (res.ok) showToast(res.message);
+    });
+  });
+}
+initBridge();
+</script>
+</body>
+</html>

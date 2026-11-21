@@ -8,6 +8,7 @@ __pycache__/
 venv/
 env/
 .env
+.venv/
 
 # Build & Dist
 build/
@@ -32,8 +33,14 @@ test*.png
 test*.pdf
 screenshot.png
 
-# Output (user data)
+# Output & release deliverables
 ~/.cctr_export/output/
+成品/
+output/
+.sessions/
 
-# portable 运行产物
-captcha_debug/
+# Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
