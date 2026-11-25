@@ -109,6 +109,55 @@ def _fmt_size(p: Path | None) -> str:
     return f"{max(1, b // 1024)} KB"
 
 
+def get_saved_accounts() -> list[dict[str, str]]:
+    """读取常用账号记忆（仅存学校代码与学号，绝不落盘密码）；未初始化时从历史任务去重导入。"""
+    settings = load_settings()
+    raw_list = settings.get("saved_accounts")
+    accounts: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def _add(sch: str, usr: str):
+        s, u = (sch or "").strip(), (usr or "").strip()
+        if not s or not u or (s, u) in seen:
+            return
+        seen.add((s, u))
+        accounts.append({"school": s, "username": u})
+
+    if isinstance(raw_list, list):
+        for item in raw_list:
+            if isinstance(item, dict):
+                _add(str(item.get("school", "")), str(item.get("username", "")))
+    else:
+        try:
+            for t in get_all_tasks():
+                _add(t.school_id, t.username)
+                if len(accounts) >= 6:
+                    break
+            if accounts:
+                save_settings({"saved_accounts": accounts})
+        except Exception:
+            pass
+    return accounts[:6]
+
+
+def remember_saved_account(school: str, username: str) -> list[dict[str, str]]:
+    """置顶并持久化最近成功登录的账号（仅学校代码与学号，最多保留 6 条）。"""
+    s, u = (school or "").strip(), (username or "").strip()
+    if not s or not u:
+        return get_saved_accounts()
+    cur = [x for x in get_saved_accounts() if not (x["school"] == s and x["username"] == u)]
+    updated = ([{"school": s, "username": u}] + cur)[:6]
+    save_settings({"saved_accounts": updated})
+    return updated
+
+
+def remove_saved_account(school: str, username: str) -> list[dict[str, str]]:
+    s, u = (school or "").strip(), (username or "").strip()
+    updated = [x for x in get_saved_accounts() if not (x["school"] == s and x["username"] == u)]
+    save_settings({"saved_accounts": updated})
+    return updated
+
+
 class _CaptchaWorker(QThread):
     done = Signal(str)
 
@@ -370,6 +419,7 @@ class DesktopBridge(QObject):
             "ocrAvailable": is_ocr_available(),
             "darkMode": bool(settings.get("dark_mode", False)),
             "exportDir": str(get_export_dir()),
+            "savedAccounts": get_saved_accounts(),
             "kernels": self._kernels_payload(),
             **self._tasks_and_logs_payload(),
         }
@@ -396,8 +446,23 @@ class DesktopBridge(QObject):
         c.username = username.strip()
         c.password = password.strip()
         w = _LoginWorker(c, captcha.strip(), auto_retry_ocr)
-        w.done.connect(self.loginDone.emit)
+
+        def on_done(raw: str):
+            try:
+                data = json.loads(raw)
+                if data.get("ok"):
+                    data["savedAccounts"] = remember_saved_account(c.school_id, c.username)
+                    raw = json.dumps(data, ensure_ascii=False)
+            except Exception:
+                pass
+            self.loginDone.emit(raw)
+
+        w.done.connect(on_done)
         self._keep_worker(w)
+
+    @Slot(str, str, result=str)
+    def removeSavedAccount(self, school: str, username: str) -> str:
+        return json.dumps({"savedAccounts": remove_saved_account(school, username)}, ensure_ascii=False)
 
     @Slot(str)
     def loadFilters(self, practice_json: str):

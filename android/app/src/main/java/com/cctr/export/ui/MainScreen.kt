@@ -748,57 +748,160 @@ private fun WorkspaceStage(vm: MainViewModel, state: MainUiState, isTablet: Bool
 private fun AuthStepView(vm: MainViewModel, state: MainUiState, isExpanded: Boolean) {
     if (isExpanded) {
         Row(
-            modifier = Modifier.widthIn(max = 940.dp).fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(44.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.widthIn(max = 960.dp).fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Column(modifier = Modifier.weight(1.05f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("ISO 216 · A4 TYPESETTING", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted, letterSpacing = 0.8.sp)
-                Text("无损题库印务与排版系统", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
-                Text(
-                    "直连校内题库并逐题校验完整性，剥离 Word 智能标签与杂乱样式，按 10.5pt 标准生成印刷级 A4 讲义与分类归档。",
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp,
-                    color = CctrColors.InkSecondary
-                )
-                Spacer(Modifier.height(6.dp))
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
-                    SpecLedgerLine("01", "版面基准", "ISO A4 · 四周 18 mm 留白")
-                    SpecLedgerLine("02", "字号公式", "10.5pt 正文 · Wiris 0.86x")
-                    SpecLedgerLine("03", "端侧能力", "ONNX 离线识码 · 防隔页分页")
-                }
+            Box(modifier = Modifier.weight(1f)) {
+                QuickUtilityColumn(vm, state)
             }
             AtelierAuthSheet(vm, state, modifier = Modifier.width(400.dp))
         }
     } else {
         Column(
-            modifier = Modifier.widthIn(max = 440.dp).fillMaxWidth(),
+            modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("ISO 216 · A4 TYPESETTING", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted, letterSpacing = 0.7.sp)
-                Text("无损题库印务与排版系统", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
-                Text("统一 10.5pt 字号与公式比例，导出直存 Download/CCTRExport", fontSize = 12.sp, color = CctrColors.InkSecondary)
-            }
             AtelierAuthSheet(vm, state, modifier = Modifier.fillMaxWidth())
+            QuickUtilityColumn(vm, state)
         }
     }
 }
 
 @Composable
-private fun SpecLedgerLine(no: String, key: String, value: String) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+private fun QuickUtilityColumn(vm: MainViewModel, state: MainUiState) {
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        // 1. Saved accounts quick-fill
+        Surface(
+            color = CctrColors.BgSurface,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, CctrColors.BorderHairline),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(no, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
-            Text(key, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary, modifier = Modifier.width(72.dp))
-            Text(value, fontSize = 11.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkSecondary)
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("常用账号（点击填入）", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                    Text("不存密码", fontSize = 10.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
+                }
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
+
+                if (state.savedAccounts.isEmpty()) {
+                    Text(
+                        "成功登录后会自动记住学校代码与学号，下次轻点即可快速填入。",
+                        fontSize = 12.sp,
+                        color = CctrColors.InkMuted
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.savedAccounts.forEach { acc ->
+                            Surface(
+                                color = CctrColors.BgSheetSoft,
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                                modifier = Modifier.fillMaxWidth().clickable { vm.applySavedAccount(acc) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Surface(color = CctrColors.BgSubtle, shape = RoundedCornerShape(4.dp)) {
+                                        Text(
+                                            acc.schoolCode,
+                                            fontSize = 10.5.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = CctrColors.InkSecondary,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Text(
+                                        acc.username,
+                                        fontSize = 12.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = CctrColors.InkPrimary,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        "移除",
+                                        fontSize = 11.sp,
+                                        color = CctrColors.InkMuted,
+                                        modifier = Modifier.clickable { vm.removeSavedAccount(acc) }.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
+
+        // 2. Recent exported files quick access (no login needed)
+        Surface(
+            color = CctrColors.BgSurface,
+            shape = RoundedCornerShape(8.dp),
+            border = BorderStroke(1.dp, CctrColors.BorderHairline),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("最近成稿（免登录查看）", fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                    Text(
+                        "全部归档",
+                        fontSize = 11.5.sp,
+                        color = CctrColors.InkSecondary,
+                        modifier = Modifier.clickable { vm.setTab(2) }.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
+
+                if (state.savedFiles.isEmpty()) {
+                    Text("暂无已导出成稿，完成后可在此免登录直接打开。", fontSize = 12.sp, color = CctrColors.InkMuted)
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.savedFiles.take(5).forEach { file ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { openExportedFile(context, file) }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    color = CctrColors.BgSubtle,
+                                    shape = RoundedCornerShape(4.dp),
+                                    border = BorderStroke(1.dp, CctrColors.BorderHairline)
+                                ) {
+                                    Text(
+                                        file.extension.uppercase().ifBlank { "FILE" },
+                                        fontSize = 10.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = CctrColors.InkPrimary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(file.name, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, color = CctrColors.InkPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("${file.length() / 1024} KB · 点击打开", fontSize = 10.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

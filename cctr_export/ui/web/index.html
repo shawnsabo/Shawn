@@ -271,38 +271,66 @@
   .input:focus { outline: none; border-color: var(--ink); }
   .input::placeholder { color: var(--ink-3); }
 
-  /* ── Step 0: Editorial Asymmetric Auth ──────────────────── */
+  /* ── Step 0: Quick Desk + Auth Form ────────────────────── */
   .auth-wrap {
     flex: 1; display: flex; align-items: center; justify-content: center;
     padding: 8px 0 16px;
   }
   .auth-grid {
-    width: 100%; max-width: 940px;
-    display: grid; grid-template-columns: 1.1fr 400px;
-    gap: 56px; align-items: center;
+    width: 100%; max-width: 960px;
+    display: grid; grid-template-columns: 1fr 400px;
+    gap: 28px; align-items: start;
   }
-  .editorial-kicker {
-    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
-    color: var(--ink-3); text-transform: uppercase; margin-bottom: 12px;
+  .auth-desk { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .desk-card {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow-sheet);
   }
-  .editorial-h {
-    font-size: 28px; font-weight: 600; line-height: 1.24;
-    letter-spacing: -0.025em; color: var(--ink); margin-bottom: 12px;
+  .desk-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding-bottom: 11px; margin-bottom: 12px; border-bottom: 1px solid var(--line);
   }
-  .editorial-desc {
-    font-size: 13.5px; line-height: 1.65; color: var(--ink-2);
-    max-width: 440px; margin-bottom: 28px;
+  .desk-head h3 { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .desk-links { display: inline-flex; align-items: center; gap: 10px; }
+  .desk-link {
+    border: none; background: transparent; padding: 0;
+    font-size: 11.5px; color: var(--ink-3); cursor: pointer;
   }
-  .spec-ledger { border-top: 1px solid var(--line); }
-  .spec-ledger-row {
-    display: grid; grid-template-columns: 34px 92px 1fr;
-    gap: 10px; align-items: baseline;
-    padding: 11px 0; border-bottom: 1px solid var(--line);
-    font-size: 12.5px;
+  .desk-link:hover { color: var(--ink); }
+
+  .acc-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .acc-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--sheet-soft); border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 10px; transition: border-color 0.14s, background 0.14s;
   }
-  .spec-ledger-row .no { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-  .spec-ledger-row .k { font-weight: 600; color: var(--ink); }
-  .spec-ledger-row .v { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+  .acc-chip:hover { border-color: var(--line-strong); background: var(--well); }
+  .acc-fill {
+    border: none; background: transparent; padding: 0; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px; text-align: left;
+  }
+  .acc-school {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+    padding: 1px 6px; border-radius: 4px;
+    background: var(--well); color: var(--ink-2);
+  }
+  .acc-user { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--ink); }
+  .acc-del {
+    border: none; background: transparent; color: var(--ink-3);
+    cursor: pointer; font-size: 13px; line-height: 1; padding: 1px 3px; border-radius: 3px;
+  }
+  .acc-del:hover { color: var(--vermilion); background: var(--vermilion-soft); }
+
+  .quick-list { display: flex; flex-direction: column; }
+  .quick-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 9px 2px; border-bottom: 1px solid var(--line);
+  }
+  .quick-row:last-child { border-bottom: none; padding-bottom: 2px; }
+  .quick-main { min-width: 0; flex: 1; }
+  .quick-name { font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .quick-meta { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin-top: 2px; }
+  .quick-empty { font-size: 12px; color: var(--ink-3); padding: 8px 0 4px; }
 
   .auth-sheet {
     background: var(--paper);
@@ -631,8 +659,8 @@
 
   /* ── Responsive Tablet / Narrow Window (< 960px / <= 780px) ─ */
   @media (max-width: 960px) {
-    .auth-grid { grid-template-columns: 1fr; max-width: 440px; gap: 20px; }
-    .editorial-col { display: none; }
+    .auth-grid { grid-template-columns: 1fr; max-width: 480px; gap: 18px; }
+    .auth-sheet { order: -1; }
     .studio-grid { grid-template-columns: 1fr; }
     .tool-dir-text { max-width: 84px; }
   }
@@ -758,30 +786,30 @@
       </div>
 
       <div class="scroll-body">
-        <!-- Step 0: Editorial Auth -->
+        <!-- Step 0: Quick Desk & Auth -->
         <div class="auth-wrap" id="paneStep0">
           <div class="auth-grid">
-            <div class="editorial-col">
-              <div class="editorial-kicker">ISO 216 · A4 Typesetting Workbench</div>
-              <h1 class="editorial-h">无损题库印务与排版系统</h1>
-              <p class="editorial-desc">
-                直连学校题库接口并逐题核对完整性，清洗 Word 智能标签与杂乱样式，按统一 10.5pt 视觉标准生成可打印的 A4 讲义与分类归档。
-              </p>
-              <div class="spec-ledger">
-                <div class="spec-ledger-row">
-                  <span class="no">01</span>
-                  <span class="k">版面基准</span>
-                  <span class="v">ISO A4 (210×297 mm) · 四周 18 mm 留白</span>
+            <div class="auth-desk">
+              <div class="desk-card">
+                <div class="desk-head">
+                  <h3>常用账号（一键填入）</h3>
+                  <span class="mono" style="font-size:10.5px;color:var(--ink-3);">LOCAL ONLY · 不存密码</span>
                 </div>
-                <div class="spec-ledger-row">
-                  <span class="no">02</span>
-                  <span class="k">字号与公式</span>
-                  <span class="v">10.5pt 正文 · Wiris 0.86× · OSS 直连预内联</span>
+                <div id="savedAccountsBox">
+                  <div class="quick-empty">成功登录后自动记住学校代码与学号，下次点击即可填入。</div>
                 </div>
-                <div class="spec-ledger-row">
-                  <span class="no">03</span>
-                  <span class="k">端侧安全</span>
-                  <span class="v">本地直连 · 离线 OCR 识别 · 导出后保持会话</span>
+              </div>
+
+              <div class="desk-card">
+                <div class="desk-head">
+                  <h3>最近成稿（免登录快捷打开）</h3>
+                  <div class="desk-links">
+                    <button class="desk-link" onclick="bridge && bridge.openExportDir()">打开目录</button>
+                    <button class="desk-link" onclick="switchView('history')">全部归档</button>
+                  </div>
+                </div>
+                <div id="quickExportsBox">
+                  <div class="quick-empty">暂无最近导出文件。</div>
                 </div>
               </div>
             </div>
@@ -1059,6 +1087,7 @@ let selectedIds = new Set();
 let exportFmt = 'pdf';
 let exportVariant = 'withAnswersRed';
 let kernelsState = { preferred: 'auto', labels: [], items: {} };
+let savedAccounts = [];
 let tasksCache = [];
 let logsCache = [];
 let activeTaskId = null;
@@ -1457,6 +1486,62 @@ function renderStatePayload(data) {
   }
 }
 
+function renderSavedAccounts() {
+  const box = qs('savedAccountsBox');
+  if (!box) return;
+  if (!savedAccounts || !savedAccounts.length) {
+    box.innerHTML = '<div class="quick-empty">成功登录后自动记住学校代码与学号，下次点击即可填入。</div>';
+    return;
+  }
+  box.innerHTML = '<div class="acc-list">' + savedAccounts.map(acc => `
+    <div class="acc-chip">
+      <button type="button" class="acc-fill" onclick="fillSavedAccount('${escapeHtml(acc.school)}','${escapeHtml(acc.username)}')">
+        <span class="acc-school">${escapeHtml(acc.school)}</span>
+        <span class="acc-user">${escapeHtml(acc.username)}</span>
+      </button>
+      <button type="button" class="acc-del" title="移除记忆账号" onclick="removeSavedAccount('${escapeHtml(acc.school)}','${escapeHtml(acc.username)}')">×</button>
+    </div>
+  `).join('') + '</div>';
+}
+
+function fillSavedAccount(school, username) {
+  qs('schoolInput').value = school || '';
+  qs('userInput').value = username || '';
+  qs('passInput').focus();
+  showToast(`已填入 ${school} · ${username}`);
+}
+
+function removeSavedAccount(school, username) {
+  if (!bridge || !bridge.removeSavedAccount) return;
+  bridge.removeSavedAccount(school, username, raw => {
+    const res = JSON.parse(raw);
+    savedAccounts = res.savedAccounts || [];
+    renderSavedAccounts();
+  });
+}
+
+function renderQuickExports() {
+  const box = qs('quickExportsBox');
+  if (!box) return;
+  const ready = tasksCache.filter(t => t.status === 'success' && t.file_path).slice(0, 5);
+  if (!ready.length) {
+    box.innerHTML = '<div class="quick-empty">暂无最近导出成稿。</div>';
+    return;
+  }
+  box.innerHTML = '<div class="quick-list">' + ready.map(t => `
+    <div class="quick-row">
+      <div class="quick-main">
+        <div class="quick-name" title="${escapeHtml(t.file_name || t.title)}">${escapeHtml(t.file_name || t.title)}</div>
+        <div class="quick-meta">${escapeHtml((t.create_time || '').slice(5, 16))}${t.file_size ? ' · ' + escapeHtml(t.file_size) : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button type="button" class="btn btn-carbon" style="height:28px;padding:0 10px;font-size:11.5px;" onclick="bridge && bridge.openTaskFile(${t.id})">打开</button>
+        <button type="button" class="btn btn-outline" style="height:28px;padding:0 9px;font-size:11.5px;" onclick="bridge && bridge.openTaskDir(${t.id})">目录</button>
+      </div>
+    </div>
+  `).join('') + '</div>';
+}
+
 function renderTasksUI() {
   const busy = tasksCache.filter(t => t.status === 'processing' || t.status === 'waiting').length;
   const badge = qs('navTaskBadge');
@@ -1485,6 +1570,7 @@ function renderTasksUI() {
     : '暂无归档记录';
 
   const histBox = qs('historyList');
+  renderQuickExports();
   if (!tasksCache.length) {
     histBox.innerHTML = '<div class="empty-state">尚无导出成稿记录，在“工作台”提交导出后将在此归档。</div>';
   } else {
@@ -1599,6 +1685,8 @@ function initBridge() {
       const state = JSON.parse(raw);
       applyTheme(state.darkMode);
       applyExportDirUI(state.exportDir);
+      savedAccounts = state.savedAccounts || [];
+      renderSavedAccounts();
       applyKernelState(state.kernels);
       renderStatePayload(state);
       refreshCaptcha();
@@ -1641,6 +1729,10 @@ function initBridge() {
         return;
       }
       isLoggedIn = true;
+      if (Array.isArray(res.savedAccounts)) {
+        savedAccounts = res.savedAccounts;
+        renderSavedAccounts();
+      }
       practices = res.practices || [];
       const validIds = new Set(practices.map(p => String(p.id)));
       selectedIds = new Set(Array.from(selectedIds).filter(id => validIds.has(id)));

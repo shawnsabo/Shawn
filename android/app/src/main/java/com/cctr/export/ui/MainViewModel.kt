@@ -1,10 +1,13 @@
 package com.cctr.export.ui
 
 import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import org.json.JSONArray
+import org.json.JSONObject
 import com.cctr.export.core.AnswerVariant
 import com.cctr.export.core.CaptchaOcr
 import com.cctr.export.core.CctrApiClient
@@ -27,12 +30,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class SavedAccount(
+    val schoolCode: String,
+    val username: String
+)
+
 data class MainUiState(
     val activeTab: Int = 0, // 0=导出工作台, 1=任务进度, 2=本地文件
     val wizardStep: Int = 1, // 1=登录, 2=选练习, 3=导出设置
     val schoolCode: String = "",
     val username: String = "",
     val password: String = "",
+    val savedAccounts: List<SavedAccount> = emptyList(),
     val captchaCode: String = "",
     val captchaBitmap: Bitmap? = null,
     val captchaLoading: Boolean = false,
@@ -64,13 +73,61 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val api = CctrApiClient()
     private val exporter = PdfAndZipExporter(application)
     private val ocr: CaptchaOcr? = runCatching { CaptchaOcr(application) }.getOrNull()
+    private val prefs = application.getSharedPreferences("cctr_atelier_prefs", Context.MODE_PRIVATE)
 
-    private val _state = MutableStateFlow(MainUiState())
+    private val _state = MutableStateFlow(MainUiState(savedAccounts = loadSavedAccounts()))
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
     init {
         refreshSavedFiles()
         loadCaptcha()
+    }
+
+    private fun loadSavedAccounts(): List<SavedAccount> {
+        val raw = prefs.getString("saved_accounts", "[]") ?: "[]"
+        val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        val out = mutableListOf<SavedAccount>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val sc = obj.optString("school").trim()
+            val un = obj.optString("username").trim()
+            if (sc.isNotEmpty() && un.isNotEmpty()) {
+                out += SavedAccount(sc, un)
+            }
+        }
+        return out.take(6)
+    }
+
+    private fun persistSavedAccounts(list: List<SavedAccount>) {
+        val arr = JSONArray()
+        list.take(6).forEach { acc ->
+            arr.put(JSONObject().apply {
+                put("school", acc.schoolCode)
+                put("username", acc.username)
+            })
+        }
+        prefs.edit().putString("saved_accounts", arr.toString()).apply()
+    }
+
+    fun applySavedAccount(acc: SavedAccount) {
+        _state.update { it.copy(schoolCode = acc.schoolCode, username = acc.username, loginError = null) }
+    }
+
+    fun removeSavedAccount(acc: SavedAccount) {
+        val updated = _state.value.savedAccounts.filterNot { it.schoolCode == acc.schoolCode && it.username == acc.username }
+        persistSavedAccounts(updated)
+        _state.update { it.copy(savedAccounts = updated) }
+    }
+
+    private fun rememberAccount(school: String, username: String) {
+        val s = school.trim()
+        val u = username.trim()
+        if (s.isEmpty() || u.isEmpty()) return
+        val updated = (listOf(SavedAccount(s, u)) + _state.value.savedAccounts.filterNot {
+            it.schoolCode == s && it.username == u
+        }).take(6)
+        persistSavedAccounts(updated)
+        _state.update { it.copy(savedAccounts = updated) }
     }
 
     private fun appendLog(msg: String) {
@@ -193,6 +250,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val unique = list.distinctBy { "${it.lessonName}|${it.practiceName}" }
                     .sortedWith(compareBy({ it.lessonName }, { it.practiceName }))
+                rememberAccount(s.schoolCode, s.username)
                 _state.update {
                     it.copy(
                         loginBusy = false,

@@ -356,3 +356,31 @@ def test_word_smarttags_font_mso_comments_and_image_inlining(monkeypatch):
     assert inlined[0].subject_html.startswith('<p><img src="data:image/png;base64,')
     assert inlined[0].options[0].html.startswith('<img src="data:image/png;base64,')
 
+
+def test_saved_accounts_persistence_and_no_passwords(tmp_path: Path, monkeypatch):
+    from cctr_export.core import kernels
+    from cctr_export.ui import studio_web
+
+    settings_file = tmp_path / "settings.json"
+    monkeypatch.setattr(kernels, "SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(studio_web, "get_all_tasks", lambda: [])
+
+    assert studio_web.get_saved_accounts() == []
+    res = studio_web.remember_saved_account("u101441", "20260001")
+    assert res == [{"school": "u101441", "username": "20260001"}]
+    res = studio_web.remember_saved_account("u101442", "20260002")
+    assert res[0] == {"school": "u101442", "username": "20260002"}
+    # Deduplicate and promote re-used account to top
+    res = studio_web.remember_saved_account("u101441", "20260001")
+    assert res == [
+        {"school": "u101441", "username": "20260001"},
+        {"school": "u101442", "username": "20260002"},
+    ]
+    # Ensure no password field is persisted
+    raw = settings_file.read_text(encoding="utf-8")
+    assert "password" not in raw.lower()
+
+    after_rm = studio_web.remove_saved_account("u101441", "20260001")
+    assert after_rm == [{"school": "u101442", "username": "20260002"}]
+
+
