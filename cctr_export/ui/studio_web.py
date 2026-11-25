@@ -516,8 +516,8 @@ class DesktopBridge(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CCTR Studio · 融智云考无损导出工作台")
-        self.setMinimumSize(QSize(1160, 740))
+        self.setWindowTitle("CCTR Atelier · 融智云考印务工作台")
+        self.setMinimumSize(QSize(680, 560))
         self.resize(1340, 840)
 
         screen = self.screen().availableGeometry()

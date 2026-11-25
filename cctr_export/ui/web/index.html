@@ -3,839 +3,993 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CCTR Studio · 融智云考无损导出工作台</title>
+<title>CCTR Atelier · 融智云考印务工作台</title>
 <style>
   :root {
-    --bg: #f6f7fb;
-    --sidebar: #eef1f7;
-    --surface: #ffffff;
-    --surface-2: #f8fafc;
-    --surface-hover: #f1f5f9;
-    --border: rgba(15, 23, 42, 0.08);
-    --border-strong: rgba(15, 23, 42, 0.14);
-    --text: #0f172a;
-    --text-2: #475569;
-    --text-3: #94a3b8;
-    --primary: #4338ca;
-    --primary-hover: #3730a3;
-    --primary-soft: rgba(67, 56, 202, 0.08);
-    --primary-border: rgba(67, 56, 202, 0.24);
-    --ok: #059669;
-    --ok-soft: #ecfdf5;
-    --ok-border: #a7f3d0;
-    --warn: #d97706;
-    --warn-soft: #fffbeb;
-    --warn-border: #fde68a;
-    --err: #dc2626;
-    --err-soft: #fef2f2;
-    --err-border: #fecaca;
-    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-    --shadow-md: 0 10px 30px -12px rgba(15, 23, 42, 0.10), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
-    --radius-sm: 8px;
-    --radius: 12px;
-    --radius-lg: 16px;
+    --frame: #f4f3ef;
+    --paper: #ffffff;
+    --sheet-soft: #faf9f6;
+    --well: #eae7e0;
+    --well-hover: #e2ded5;
+    --line: #e2dfd7;
+    --line-strong: #cbc7bd;
+    --ink: #141413;
+    --ink-2: #57544e;
+    --ink-3: #8a867e;
+    --btn-bg: #141413;
+    --btn-fg: #faf9f6;
+    --btn-hover: #2c2b28;
+    --vermilion: #c83e2b;
+    --vermilion-soft: #faf0ee;
+    --vermilion-line: rgba(200, 62, 43, 0.28);
+    --jade: #1e6b4e;
+    --jade-soft: #edf5f1;
+    --jade-line: rgba(30, 107, 78, 0.28);
+    --amber: #a16207;
+    --amber-soft: #fef9c3;
+    --shadow-sheet: 0 1px 2px rgba(20, 20, 19, 0.04), 0 8px 24px -12px rgba(20, 20, 19, 0.08);
     --font: "Microsoft YaHei UI", "PingFang SC", "Segoe UI", system-ui, -apple-system, sans-serif;
-    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    --mono: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
   }
 
   html.dark {
-    --bg: #0b0e14;
-    --sidebar: #111520;
-    --surface: #161b26;
-    --surface-2: #1c2230;
-    --surface-hover: #22293a;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --text: #f1f5f9;
-    --text-2: #cbd5e1;
-    --text-3: #64748b;
-    --primary: #6366f1;
-    --primary-hover: #818cf8;
-    --primary-soft: rgba(99, 102, 241, 0.14);
-    --primary-border: rgba(129, 140, 248, 0.34);
-    --ok: #34d399;
-    --ok-soft: rgba(16, 185, 129, 0.12);
-    --ok-border: rgba(52, 211, 153, 0.28);
-    --warn: #fbbf24;
-    --warn-soft: rgba(245, 158, 11, 0.12);
-    --warn-border: rgba(251, 191, 36, 0.28);
-    --err: #f87171;
-    --err-soft: rgba(239, 68, 68, 0.12);
-    --err-border: rgba(248, 113, 113, 0.28);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow-md: 0 16px 36px -12px rgba(0, 0, 0, 0.55);
+    --frame: #0e0e0d;
+    --paper: #151514;
+    --sheet-soft: #1a1a18;
+    --well: #1e1e1c;
+    --well-hover: #272624;
+    --line: #262523;
+    --line-strong: #3a3835;
+    --ink: #ededea;
+    --ink-2: #a3a09a;
+    --ink-3: #6e6b65;
+    --btn-bg: #ededea;
+    --btn-fg: #141413;
+    --btn-hover: #d8d6d0;
+    --vermilion: #e26250;
+    --vermilion-soft: rgba(226, 98, 80, 0.13);
+    --vermilion-line: rgba(226, 98, 80, 0.34);
+    --jade: #4ead89;
+    --jade-soft: rgba(78, 173, 137, 0.13);
+    --jade-line: rgba(78, 173, 137, 0.32);
+    --amber: #eab308;
+    --amber-soft: rgba(234, 179, 8, 0.13);
+    --shadow-sheet: 0 2px 12px rgba(0, 0, 0, 0.45);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13.5px; line-height: 1.5; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  html, body {
+    height: 100%;
+    font-family: var(--font);
+    background: var(--frame);
+    color: var(--ink);
+    font-size: 13.5px;
+    line-height: 1.5;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
   button, input, select { font-family: inherit; color: inherit; }
-  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 2px; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-  .shell { display: flex; height: 100vh; width: 100vw; }
+  .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
 
-  /* ── Left Rail ─────────────────────────── */
-  .rail {
-    width: 228px; min-width: 228px;
-    background: var(--sidebar);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    padding: 18px 14px 14px;
+  /* ── Top Precision Bar (48px) ───────────────────────────── */
+  .topbar {
+    min-height: 48px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    padding: 0 18px;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 12px;
     user-select: none;
-  }
-  .brand {
-    display: flex; align-items: center; gap: 11px;
-    padding: 4px 6px 18px;
-  }
-  .brand-mark {
-    width: 34px; height: 34px; border-radius: 10px;
-    background: linear-gradient(135deg, #4338ca, #6366f1);
-    color: #fff; font-weight: 800; font-size: 15px;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(67, 56, 202, 0.28);
     flex-shrink: 0;
   }
-  .brand-name { font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
-  .brand-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .top-left, .top-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .top-left { align-items: stretch; }
 
-  .nav-list { display: flex; flex-direction: column; gap: 4px; }
-  .nav-item {
-    display: flex; align-items: center; justify-content: space-between;
-    width: 100%; border: none; background: transparent;
-    padding: 9px 11px; border-radius: var(--radius-sm);
-    font-size: 13px; font-weight: 500; color: var(--text-2);
-    cursor: pointer; transition: all 0.14s ease; text-align: left;
+  .brand {
+    display: flex; align-items: center; gap: 9px;
+    padding-right: 14px;
   }
-  .nav-item-left { display: flex; align-items: center; gap: 9px; }
-  .nav-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.85; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; flex-shrink: 0; }
-  .nav-item:hover { background: var(--surface-hover); color: var(--text); }
-  .nav-item.active {
-    background: var(--surface);
-    color: var(--primary);
-    font-weight: 600;
-    box-shadow: var(--shadow-sm);
+  .brand-mark { width: 18px; height: 18px; color: var(--ink); flex-shrink: 0; }
+  .brand-name { font-size: 13.5px; font-weight: 600; letter-spacing: -0.015em; white-space: nowrap; }
+  .vtick { width: 1px; height: 18px; background: var(--line); align-self: center; flex-shrink: 0; }
+
+  .top-nav { display: flex; align-items: stretch; gap: 2px; margin-left: 2px; }
+  .nav-tab {
+    position: relative;
+    border: none; background: transparent;
+    padding: 0 12px;
+    font-size: 13px; font-weight: 500; color: var(--ink-3);
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color 0.14s ease;
+    white-space: nowrap;
   }
-  .nav-item.active svg { opacity: 1; stroke: var(--primary); }
-  .nav-badge {
-    font-size: 11px; font-weight: 600;
-    padding: 1px 7px; border-radius: 999px;
-    background: var(--primary-soft); color: var(--primary);
+  .nav-tab:hover { color: var(--ink); }
+  .nav-tab.active { color: var(--ink); font-weight: 600; }
+  .nav-tab.active::after {
+    content: "";
+    position: absolute; left: 10px; right: 10px; bottom: 0;
+    height: 2px; background: var(--ink);
+  }
+  .tab-count {
+    font-family: var(--mono);
+    font-size: 10.5px; font-weight: 600;
+    padding: 1px 5px; border-radius: 4px;
+    background: var(--well); color: var(--ink-2);
   }
 
-  .rail-spacer { flex: 1; }
+  .session-chip {
+    display: none; align-items: center; gap: 6px;
+    height: 30px; max-width: 158px; white-space: nowrap; overflow: hidden;
+    padding: 0 9px; border-radius: 6px;
+    background: var(--jade-soft); border: 1px solid var(--jade-line);
+    color: var(--jade); font-size: 11.5px; font-weight: 600;
+  }
+  .session-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .session-chip.show { display: inline-flex; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+  .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--jade); animation: pulse 1.2s ease-in-out infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.45); opacity: 0.45; } }
 
-  .rail-dock { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .dock-btn {
-    width: 100%; border: 1px solid var(--border);
-    background: var(--surface); border-radius: 10px;
-    padding: 9px 11px; cursor: pointer; text-align: left;
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  .tool-group {
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--sheet-soft);
+    overflow: hidden;
+  }
+  .tool-btn {
+    height: 30px; border: none; background: transparent;
+    padding: 0 10px; font-size: 12px; color: var(--ink-2);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.14s, color 0.14s; white-space: nowrap;
+  }
+  .tool-btn:hover { background: var(--well); color: var(--ink); }
+  .tool-btn + .tool-btn { border-left: 1px solid var(--line); }
+  .tool-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
+  .tool-dir-text { max-width: 128px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+
+  .icon-btn {
+    width: 30px; height: 30px;
+    border: 1px solid var(--line); background: var(--sheet-soft);
+    border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--ink-2); transition: background 0.14s, color 0.14s;
+  }
+  .icon-btn:hover { background: var(--well); color: var(--ink); }
+  .icon-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+
+  .activity-btn {
+    height: 30px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--sheet-soft); color: var(--ink-2);
+    font-size: 12px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: all 0.14s; max-width: 220px;
+  }
+  .activity-btn:hover { border-color: var(--line-strong); color: var(--ink); background: var(--well); }
+  .activity-btn.busy { background: var(--jade-soft); border-color: var(--jade-line); color: var(--jade); }
+  .activity-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Main Canvas & Views ─────────────────────────────────── */
+  .stage { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .view { display: none; flex: 1; flex-direction: column; min-height: 0; }
+  .view.active { display: flex; }
+
+  /* Architectural 3-Step Index Strip */
+  .index-strip {
+    height: 40px; min-height: 40px;
+    background: var(--sheet-soft);
+    border-bottom: 1px solid var(--line);
+    padding: 0 28px;
+    display: flex; align-items: stretch; justify-content: space-between;
+  }
+  .step-tabs { display: flex; align-items: stretch; gap: 24px; }
+  .step-tab {
+    position: relative;
+    border: none; background: transparent;
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 500; color: var(--ink-3);
+    cursor: pointer; transition: color 0.14s;
+  }
+  .step-tab .idx { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .step-tab:hover:not(:disabled) { color: var(--ink); }
+  .step-tab.active { color: var(--ink); font-weight: 600; }
+  .step-tab.active .idx { color: var(--ink); }
+  .step-tab.active::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+    height: 2px; background: var(--ink);
+  }
+  .step-tab.done { color: var(--ink-2); }
+  .step-tab.done .idx { color: var(--jade); }
+  .step-tab:disabled { opacity: 0.4; cursor: default; }
+  .strip-meta {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  }
+
+  .scroll-body { flex: 1; overflow-y: auto; padding: 28px 32px 36px; display: flex; flex-direction: column; }
+
+  /* ── Common Controls ────────────────────────────────────── */
+  .btn {
+    height: 36px; padding: 0 14px; border-radius: 6px;
+    font-size: 12.5px; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background 0.14s, border-color 0.14s, opacity 0.14s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.42; cursor: not-allowed; }
+  .btn-carbon { background: var(--btn-bg); color: var(--btn-fg); }
+  .btn-carbon:hover:not(:disabled) { background: var(--btn-hover); }
+  .btn-outline { background: var(--paper); color: var(--ink); border-color: var(--line-strong); }
+  .btn-outline:hover:not(:disabled) { background: var(--well); }
+  .btn-text { background: transparent; color: var(--ink-2); padding: 0 10px; }
+  .btn-text:hover:not(:disabled) { color: var(--ink); background: var(--well); }
+  .btn-danger-text { background: transparent; color: var(--ink-3); padding: 0 9px; font-size: 12px; font-weight: 500; }
+  .btn-danger-text:hover { color: var(--vermilion); background: var(--vermilion-soft); }
+
+  .input {
+    width: 100%; height: 38px; padding: 0 12px;
+    border-radius: 6px; border: 1px solid var(--line-strong);
+    background: var(--paper); font-size: 13px; color: var(--ink);
     transition: border-color 0.14s, background 0.14s;
   }
-  .dock-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
-  .dock-main { min-width: 0; flex: 1; }
-  .dock-k { font-size: 10.5px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
-  .dock-v { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-  .dock-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex-shrink: 0; }
-  .dock-dot.warn { background: var(--warn); }
+  .input:focus { outline: none; border-color: var(--ink); }
+  .input::placeholder { color: var(--ink-3); }
 
-  .dock-row { display: flex; gap: 6px; align-items: center; }
-  .chip-mini {
-    flex: 1; border: 1px solid var(--border); background: var(--surface);
-    border-radius: 9px; padding: 7px 10px; font-size: 12px; font-weight: 500;
-    color: var(--text-2); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
-    transition: all 0.14s;
+  /* ── Step 0: Editorial Asymmetric Auth ──────────────────── */
+  .auth-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 8px 0 16px;
   }
-  .chip-mini:hover { border-color: var(--border-strong); color: var(--text); }
-  .chip-mini svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  .auth-grid {
+    width: 100%; max-width: 940px;
+    display: grid; grid-template-columns: 1.1fr 400px;
+    gap: 56px; align-items: center;
+  }
+  .editorial-kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    color: var(--ink-3); text-transform: uppercase; margin-bottom: 12px;
+  }
+  .editorial-h {
+    font-size: 28px; font-weight: 600; line-height: 1.24;
+    letter-spacing: -0.025em; color: var(--ink); margin-bottom: 12px;
+  }
+  .editorial-desc {
+    font-size: 13.5px; line-height: 1.65; color: var(--ink-2);
+    max-width: 440px; margin-bottom: 28px;
+  }
+  .spec-ledger { border-top: 1px solid var(--line); }
+  .spec-ledger-row {
+    display: grid; grid-template-columns: 34px 92px 1fr;
+    gap: 10px; align-items: baseline;
+    padding: 11px 0; border-bottom: 1px solid var(--line);
+    font-size: 12.5px;
+  }
+  .spec-ledger-row .no { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .spec-ledger-row .k { font-weight: 600; color: var(--ink); }
+  .spec-ledger-row .v { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
 
-  /* ── Main Area ─────────────────────────── */
-  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
-  .topbar {
-    height: 58px; min-height: 58px;
-    padding: 0 28px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    background: var(--bg);
+  .auth-sheet {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 26px 26px 24px;
+    box-shadow: var(--shadow-sheet);
   }
-  .topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
-  .page-h { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
-  .session-pill {
-    display: none; align-items: center; gap: 7px;
-    padding: 4px 10px; border-radius: 999px;
-    background: var(--ok-soft); border: 1px solid var(--ok-border);
-    color: var(--ok); font-size: 12px; font-weight: 600;
+  .sheet-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding-bottom: 16px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--line);
   }
-  .session-pill.show { display: inline-flex; }
-  .session-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-
-  .topbar-right { display: flex; align-items: center; gap: 8px; }
-
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
-    padding: 8px 14px; border: 1px solid transparent;
-    cursor: pointer; transition: all 0.14s ease; white-space: nowrap;
-  }
-  .btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  .btn:disabled { opacity: 0.48; cursor: not-allowed; }
-  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(67, 56, 202, 0.24); }
-  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-  .btn-soft { background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: var(--shadow-sm); }
-  .btn-soft:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-2); }
-  .btn-ghost { background: transparent; color: var(--text-2); padding: 7px 11px; }
-  .btn-ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--text); }
-  .btn-danger-ghost { background: transparent; color: var(--text-3); padding: 6px 9px; font-size: 12px; }
-  .btn-danger-ghost:hover { color: var(--err); background: var(--err-soft); }
-
-  .activity-pill {
-    display: inline-flex; align-items: center; gap: 7px;
-    padding: 6px 12px; border-radius: 999px;
-    background: var(--surface); border: 1px solid var(--border);
-    font-size: 12px; font-weight: 600; color: var(--text-2);
-    cursor: pointer; transition: all 0.14s;
-  }
-  .activity-pill:hover { border-color: var(--primary-border); color: var(--primary); }
-  .activity-pill.busy { background: var(--primary-soft); border-color: var(--primary-border); color: var(--primary); }
-  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.45); opacity: 0.5; } }
-
-  /* ── Canvas Scroll Container ───────────── */
-  .canvas { flex: 1; overflow-y: auto; padding: 26px 32px 36px; display: flex; flex-direction: column; }
-  .view { display: none; width: 100%; }
-  .view.active { display: flex; flex-direction: column; flex: 1; }
-
-  /* ── Stepper Header inside Workspace ───── */
-  .stepper {
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-    margin: 0 auto 24px;
-  }
-  .step-chip {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 13px; border-radius: 999px;
-    font-size: 12.5px; font-weight: 600; color: var(--text-3);
-    background: transparent; border: 1px solid transparent; cursor: pointer;
-    transition: all 0.14s;
-  }
-  .step-chip .num {
-    width: 20px; height: 20px; border-radius: 50%; font-size: 11px;
-    display: inline-flex; align-items: center; justify-content: center;
-    background: var(--border); color: var(--text-2); font-weight: 700;
-  }
-  .step-chip.active { background: var(--surface); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-sm); }
-  .step-chip.active .num { background: var(--primary); color: #fff; }
-  .step-chip.done { color: var(--ok); }
-  .step-chip.done .num { background: var(--ok-soft); color: var(--ok); }
-  .step-chip:disabled { cursor: default; opacity: 0.55; }
-  .step-line { width: 28px; height: 1px; background: var(--border-strong); }
-
-  /* ── Centered Auth Sheet ───────────────── */
-  .auth-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding-bottom: 24px; }
-  .auth-card {
-    width: 100%; max-width: 440px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 20px; padding: 30px 30px 26px;
-    box-shadow: var(--shadow-md);
-  }
-  .auth-title { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
-  .auth-sub { font-size: 12.5px; color: var(--text-2); margin-top: 4px; margin-bottom: 22px; }
+  .sheet-head h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  .sheet-head span { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.05em; }
 
   .field { margin-bottom: 14px; }
-  .field label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
-  .input-box { position: relative; display: flex; align-items: center; }
-  .input {
-    width: 100%; height: 42px; padding: 0 13px;
-    border-radius: 10px; border: 1px solid var(--border-strong);
-    background: var(--surface-2); font-size: 13.5px;
-    transition: border-color 0.14s, background 0.14s, box-shadow 0.14s;
+  .field label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px;
   }
-  .input:focus { outline: none; border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .input-wrap { position: relative; display: flex; align-items: center; }
   .eye-btn {
-    position: absolute; right: 8px; border: none; background: transparent;
-    color: var(--text-3); cursor: pointer; padding: 5px; border-radius: 6px;
+    position: absolute; right: 7px; border: none; background: transparent;
+    color: var(--ink-3); cursor: pointer; padding: 5px; border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
   }
-  .eye-btn:hover { color: var(--text); background: var(--surface-hover); }
+  .eye-btn:hover { color: var(--ink); }
 
-  .captcha-group {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--surface-2); border: 1px solid var(--border-strong);
-    border-radius: 10px; padding: 4px 6px 4px 12px;
+  .captcha-box {
+    display: flex; align-items: stretch; height: 38px;
+    border: 1px solid var(--line-strong); border-radius: 6px;
+    background: var(--paper); overflow: hidden;
   }
-  .captcha-group:focus-within { border-color: var(--primary); background: var(--surface); box-shadow: 0 0 0 3px var(--primary-soft); }
+  .captcha-box:focus-within { border-color: var(--ink); }
   .captcha-input {
     flex: 1; min-width: 0; border: none; background: transparent;
-    font-size: 14px; font-weight: 600; letter-spacing: 0.08em; height: 34px; outline: none;
+    padding: 0 12px; font-family: var(--mono); font-size: 14px; font-weight: 600;
+    letter-spacing: 0.14em; outline: none;
   }
-  .captcha-img-wrap {
-    width: 104px; height: 36px; border-radius: 7px; overflow: hidden;
-    background: #f1f5f9; border: 1px solid var(--border); cursor: pointer;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  .captcha-img-cell {
+    width: 106px; flex-shrink: 0;
+    border-left: 1px solid var(--line); background: #ffffff;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
-  .captcha-img-wrap img { width: 100%; height: 100%; object-fit: contain; display: none; }
-  .ocr-tag { font-size: 11px; font-weight: 600; color: var(--ok); }
-  .ocr-tag.wait { color: var(--text-3); }
+  .captcha-img-cell img { width: 100%; height: 100%; object-fit: contain; display: none; }
+  .ocr-note { font-family: var(--mono); font-size: 11px; color: var(--jade); font-weight: 500; }
+  .ocr-note.wait { color: var(--ink-3); }
 
-  .banner-err {
-    display: none; margin: 12px 0 0; padding: 9px 12px; border-radius: 9px;
-    background: var(--err-soft); border: 1px solid var(--err-border);
-    color: var(--err); font-size: 12px;
+  .err-strip {
+    display: none; margin-top: 12px; padding: 9px 11px;
+    border-radius: 6px; border: 1px solid var(--vermilion-line);
+    background: var(--vermilion-soft); color: var(--vermilion);
+    font-size: 12px; line-height: 1.5;
   }
-  .banner-err.show { display: block; }
+  .err-strip.show { display: block; }
 
-  /* ── Course Selection View ─────────────── */
-  .container { width: 100%; max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; flex: 1; }
-  .toolbar-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .search-wrap { position: relative; flex: 1; min-width: 240px; max-width: 380px; }
-  .search-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; stroke: var(--text-3); fill: none; pointer-events: none; }
-  .search-wrap input { padding-left: 34px; height: 38px; border-radius: 10px; }
+  /* ── Step 1: Catalog Ledger Grid ─────────────────────────── */
+  .container { width: 100%; max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+  .search-box { position: relative; flex: 1; min-width: 220px; max-width: 380px; }
+  .search-box svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; stroke: var(--ink-3); fill: none; pointer-events: none; }
+  .search-box input { padding-left: 32px; height: 36px; }
 
   .course-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 12px; align-content: start; margin-bottom: 20px;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 10px; align-content: start; margin-bottom: 20px;
   }
   .course-card {
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: 14px; padding: 15px 16px; cursor: pointer;
-    transition: all 0.14s ease; display: flex; align-items: flex-start; gap: 12px;
-    box-shadow: var(--shadow-sm);
+    position: relative;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 14px 16px;
+    cursor: pointer; display: flex; align-items: flex-start; gap: 12px;
+    transition: border-color 0.14s, background 0.14s;
   }
-  .course-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
-  .course-card.selected { border-color: var(--primary); background: var(--primary-soft); }
-  .check-ring {
-    width: 19px; height: 19px; border-radius: 6px; margin-top: 2px;
-    border: 1.8px solid var(--border-strong); background: var(--surface);
+  .course-card:hover { border-color: var(--line-strong); }
+  .course-card.selected { border-color: var(--ink); background: var(--sheet-soft); }
+  .course-card.selected::before {
+    content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 0 2px 2px 0; background: var(--ink);
+  }
+  .sq-check {
+    width: 16px; height: 16px; border-radius: 3px; margin-top: 2px;
+    border: 1.5px solid var(--line-strong); background: var(--paper);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
-  .course-card.selected .check-ring { background: var(--primary); border-color: var(--primary); color: #fff; }
-  .check-ring svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.6; display: none; }
-  .course-card.selected .check-ring svg { display: block; }
+  .course-card.selected .sq-check { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-fg); }
+  .sq-check svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.6; display: none; }
+  .course-card.selected .sq-check svg { display: block; }
+
   .course-body { flex: 1; min-width: 0; }
-  .course-title { font-size: 14px; font-weight: 700; color: var(--text); word-break: break-word; }
-  .course-sub { font-size: 12px; color: var(--text-2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .course-meta { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 11.5px; color: var(--text-3); }
-  .q-pill { padding: 2px 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); font-weight: 600; }
+  .course-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .course-title { font-size: 13.5px; font-weight: 600; color: var(--ink); word-break: break-word; line-height: 1.4; }
+  .q-tag {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+    background: var(--well); color: var(--ink-2);
+  }
+  .course-sub { font-size: 12px; color: var(--ink-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .course-foot { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 6px; }
 
-  .sticky-footer {
-    margin-top: auto; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 12px 18px;
+  .settlement-bar {
+    margin-top: auto;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 18px;
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-sheet);
   }
 
-  /* ── Export Studio Split View ──────────── */
-  .studio-grid { display: grid; grid-template-columns: 1.12fr 0.88fr; gap: 20px; align-items: start; }
-  .panel {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-sm);
-  }
-  .panel-title { font-size: 14.5px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
-
-  .opt-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-  .seg-card {
-    border: 1.5px solid var(--border); background: var(--surface-2);
-    border-radius: 12px; padding: 12px; cursor: pointer; text-align: left;
-    transition: all 0.14s;
-  }
-  .seg-card:hover { border-color: var(--border-strong); }
-  .seg-card.active { border-color: var(--primary); background: var(--primary-soft); }
-  .seg-card strong { display: block; font-size: 13px; color: var(--text); }
-  .seg-card span { display: block; font-size: 11px; color: var(--text-3); margin-top: 3px; }
-  .seg-card.active strong { color: var(--primary); }
-
-  .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-  .choice-pill {
-    border: 1px solid var(--border-strong); background: var(--surface-2);
-    padding: 7px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
-    color: var(--text-2); cursor: pointer; transition: all 0.14s;
-  }
-  .choice-pill.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-
-  .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-  .select {
-    width: 100%; height: 38px; padding: 0 10px;
-    border-radius: 9px; border: 1px solid var(--border-strong);
-    background: var(--surface-2); font-size: 12.5px;
-  }
-
-  .switch-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 11px 13px; border-radius: 11px;
-    background: var(--surface-2); border: 1px solid var(--border);
-    margin-bottom: 18px; cursor: pointer;
-  }
-  .switch-row input { width: 16px; height: 16px; accent-color: var(--primary); }
-
-  /* ── Post-Export Non-Disruptive Banner ── */
+  /* ── Step 2: Export Press Bench & A4 Specimen ───────────── */
   .result-banner {
-    display: none; margin-bottom: 18px; padding: 14px 18px;
-    border-radius: 14px; border: 1px solid var(--primary-border);
-    background: var(--surface); box-shadow: var(--shadow-sm);
-    align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    display: none; margin-bottom: 16px; padding: 13px 16px;
+    border-radius: 8px; border: 1px solid var(--line);
+    background: var(--paper); align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
   }
   .result-banner.show { display: flex; }
-  .result-banner.ok { border-color: var(--ok-border); background: var(--ok-soft); }
-  .result-banner.err { border-color: var(--err-border); background: var(--err-soft); }
-  .result-info { min-width: 0; flex: 1; }
-  .result-title { font-size: 13.5px; font-weight: 700; color: var(--text); }
-  .result-sub { font-size: 12px; color: var(--text-2); margin-top: 2px; word-break: break-all; }
+  .result-banner.ok { border-color: var(--jade-line); background: var(--jade-soft); }
+  .result-banner.err { border-color: var(--vermilion-line); background: var(--vermilion-soft); }
+  .result-title { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+  .result-sub { font-size: 12px; color: var(--ink-2); margin-top: 2px; word-break: break-all; }
 
-  /* ── Live A4 Paper Specimen Card ───────── */
-  .paper-stage {
-    background: #f1f5f9; border-radius: 12px; padding: 16px;
-    border: 1px solid var(--border);
+  .studio-grid { display: grid; grid-template-columns: 1.06fr 0.94fr; gap: 20px; align-items: start; }
+  .panel {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 22px; box-shadow: var(--shadow-sheet);
   }
-  html.dark .paper-stage { background: #0e131c; }
-  .a4-sheet {
-    background: #ffffff; color: #111827;
-    border-radius: 6px; padding: 20px 22px;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  .panel-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--line);
+  }
+  .panel-head h3 { font-size: 14px; font-weight: 600; }
+  .panel-head span { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+
+  .sec-label { font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; display: block; }
+  .brick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
+  .brick {
+    position: relative;
+    border: 1px solid var(--line); background: var(--sheet-soft);
+    border-radius: 6px; padding: 11px 12px; text-align: left; cursor: pointer;
+    transition: border-color 0.14s, background 0.14s;
+  }
+  .brick:hover { border-color: var(--line-strong); }
+  .brick.active { border-color: var(--ink); background: var(--paper); }
+  .brick.active::after {
+    content: ""; position: absolute; top: 9px; right: 9px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--ink);
+  }
+  .brick strong { display: block; font-size: 12.5px; font-weight: 600; color: var(--ink); padding-right: 10px; }
+  .brick span { display: block; font-size: 11px; color: var(--ink-3); margin-top: 3px; }
+
+  .seg-track {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+    background: var(--well); padding: 3px; border-radius: 7px;
+    margin-bottom: 18px;
+  }
+  .seg-btn {
+    border: none; background: transparent;
+    border-radius: 5px; height: 32px;
+    font-size: 12px; font-weight: 500; color: var(--ink-2);
+    cursor: pointer; transition: all 0.14s;
+  }
+  .seg-btn:hover { color: var(--ink); }
+  .seg-btn.active {
+    background: var(--paper); color: var(--ink); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(20, 20, 19, 0.08);
+  }
+
+  .filter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .select {
+    width: 100%; height: 36px; padding: 0 10px;
+    border-radius: 6px; border: 1px solid var(--line-strong);
+    background: var(--paper); font-size: 12.5px;
+  }
+
+  /* Custom Switch Rows */
+  .toggle-list { border-top: 1px solid var(--line); margin-bottom: 20px; }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 12px 2px; border-bottom: 1px solid var(--line); cursor: pointer;
+  }
+  .toggle-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .toggle-desc { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; }
+  .switch { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch-track {
+    position: absolute; inset: 0; border-radius: 999px;
+    background: var(--well-hover); border: 1px solid var(--line-strong);
+    transition: background 0.16s, border-color 0.16s;
+  }
+  .switch-track::before {
+    content: ""; position: absolute; left: 2px; top: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--paper); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+    transition: transform 0.16s ease;
+  }
+  .switch input:checked + .switch-track { background: var(--btn-bg); border-color: var(--btn-bg); }
+  .switch input:checked + .switch-track::before { transform: translateX(14px); background: var(--btn-fg); }
+
+  /* Dotted Cutting Mat + A4 Crop-Marked Paper */
+  .cutting-mat {
+    background-color: var(--well);
+    background-image: radial-gradient(var(--line-strong) 1px, transparent 1px);
+    background-size: 14px 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px;
+  }
+  .a4-paper {
+    position: relative;
+    background: #ffffff; color: #141413;
+    padding: 22px 24px;
+    box-shadow: 0 6px 20px -8px rgba(20, 20, 19, 0.22);
     font-size: 11.5px; line-height: 1.68;
   }
-  .a4-h2 {
-    font-size: 12px; font-weight: 700; background: #f8fafc;
-    border-left: 3px solid #2563eb; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px;
-  }
-  .a4-qh { font-weight: 700; margin-bottom: 4px; }
-  .a4-qh span { font-weight: 400; color: #64748b; font-size: 10.5px; }
-  .a4-opt { padding: 2px 7px; border-radius: 4px; margin: 3px 0; }
-  .a4-opt.red { color: #b91c1c; font-weight: 600; background: #fef2f2; border-left: 2.5px solid #ef4444; }
-  .a4-tag {
-    display: inline-block; margin-top: 7px; padding: 1px 6px; border-radius: 4px;
-    background: #ecfdf5; border: 1px solid #a7f3d0; color: #047857; font-size: 10px; font-weight: 700;
-  }
-  .spec-list { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--text-2); }
-  .spec-item { display: flex; justify-content: space-between; gap: 10px; }
-  .spec-item strong { color: var(--text); font-weight: 600; }
+  .crop { position: absolute; width: 10px; height: 10px; pointer-events: none; }
+  .crop.tl { top: 6px; left: 6px; border-top: 1px solid #cbc7bd; border-left: 1px solid #cbc7bd; }
+  .crop.tr { top: 6px; right: 6px; border-top: 1px solid #cbc7bd; border-right: 1px solid #cbc7bd; }
+  .crop.bl { bottom: 6px; left: 6px; border-bottom: 1px solid #cbc7bd; border-left: 1px solid #cbc7bd; }
+  .crop.br { bottom: 6px; right: 6px; border-bottom: 1px solid #cbc7bd; border-right: 1px solid #cbc7bd; }
 
-  /* ── History & Logs Full Views ─────────── */
-  .task-row {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 13px; padding: 14px 18px; margin-bottom: 10px;
-    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-    box-shadow: var(--shadow-sm);
+  .a4-h2 {
+    font-size: 11.5px; font-weight: 600; color: #141413;
+    border-bottom: 1px solid #e2dfd7; padding-bottom: 5px; margin-bottom: 10px;
+    display: flex; justify-content: space-between;
   }
-  .task-left { min-width: 0; flex: 1; }
-  .task-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
-  .task-title { font-size: 14px; font-weight: 700; color: var(--text); }
-  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-  .badge.success { background: var(--ok-soft); color: var(--ok); }
-  .badge.processing { background: var(--primary-soft); color: var(--primary); }
-  .badge.waiting { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
-  .badge.failed { background: var(--err-soft); color: var(--err); }
-  .task-meta { font-size: 12px; color: var(--text-3); margin-top: 4px; word-break: break-all; }
-  .task-actions { display: flex; align-items: center; gap: 8px; }
+  .a4-qh { font-weight: 600; margin-bottom: 4px; font-size: 11.5px; }
+  .a4-qh span { font-family: var(--mono); font-weight: 400; color: #8a867e; font-size: 10px; }
+  .a4-opt { padding: 3px 8px; border-radius: 3px; margin: 3px 0; border-left: 2px solid transparent; }
+  .a4-opt.red { color: #c83e2b; font-weight: 600; background: #faf0ee; border-left-color: #c83e2b; }
+  .a4-ans { margin-top: 9px; padding-top: 7px; border-top: 1px dashed #e2dfd7; }
+  .a4-ans-tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 600;
+    padding: 1px 6px; border-radius: 3px;
+    background: #f4f3ef; border: 1px solid #e2dfd7; color: #141413;
+  }
+  .a4-ans-tag.red { background: #faf0ee; border-color: rgba(200, 62, 43, 0.3); color: #c83e2b; }
+
+  .meta-ledger { margin-top: 14px; border-top: 1px solid var(--line); }
+  .meta-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .meta-row span { color: var(--ink-3); }
+  .meta-row strong { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--ink); }
+
+  /* ── Archive & Logs Ledger Views ────────────────────────── */
+  .ledger-row {
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .ledger-title { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+  .ledger-meta { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 4px; word-break: break-all; }
+  .status-tag {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line);
+    background: var(--sheet-soft); color: var(--ink-2);
+  }
+  .status-tag.success { background: var(--jade-soft); border-color: var(--jade-line); color: var(--jade); }
+  .status-tag.processing { background: var(--amber-soft); border-color: transparent; color: var(--amber); }
+  .status-tag.failed { background: var(--vermilion-soft); border-color: var(--vermilion-line); color: var(--vermilion); }
 
   .log-console {
     flex: 1; min-height: 0;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; padding: 16px 18px;
-    font-family: var(--mono); font-size: 12px; line-height: 1.7;
-    overflow-y: auto; box-shadow: var(--shadow-sm);
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 14px 16px;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.72;
+    overflow-y: auto;
   }
-  #view-logs.active { min-height: 0; }
-  #view-logs .container { min-height: 0; height: 100%; }
-  .log-line { padding: 3px 0; border-bottom: 1px dashed var(--border); display: flex; gap: 10px; }
+  #view-logs .container { height: 100%; }
+  .log-line { padding: 3px 0; border-bottom: 1px solid var(--line); display: flex; gap: 10px; }
   .log-line:last-child { border-bottom: none; }
-  .log-ts { color: var(--text-3); flex-shrink: 0; }
-  .log-id { color: var(--primary); font-weight: 600; flex-shrink: 0; }
-  .log-msg { color: var(--text); word-break: break-word; }
-  .log-line.error .log-msg { color: var(--err); }
-  .log-line.warn .log-msg { color: var(--warn); }
+  .log-ts { color: var(--ink-3); flex-shrink: 0; }
+  .log-id { color: var(--ink); font-weight: 600; flex-shrink: 0; }
+  .log-msg { color: var(--ink-2); word-break: break-word; }
+  .log-line.error .log-msg { color: var(--vermilion); }
+  .log-line.warn .log-msg { color: var(--amber); }
 
   .empty-state {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 56px 24px; color: var(--text-3); text-align: center;
-    border: 1.5px dashed var(--border-strong); border-radius: 16px;
+    padding: 48px 20px; color: var(--ink-3); text-align: center;
+    border: 1px dashed var(--line-strong); border-radius: 8px; background: var(--paper);
   }
 
-  /* ── Kernel Manager Modal ──────────────── */
+  /* ── Drawer & Modal & Toast ─────────────────────────────── */
   .modal-mask {
     display: none; position: fixed; inset: 0; z-index: 90;
-    background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(4px);
+    background: rgba(20, 20, 19, 0.42); backdrop-filter: blur(3px);
     align-items: center; justify-content: center; padding: 20px;
   }
   .modal-mask.show { display: flex; }
   .modal {
-    width: 100%; max-width: 540px; max-height: 86vh; overflow-y: auto;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 18px; padding: 22px 24px; box-shadow: var(--shadow-md);
+    width: 100%; max-width: 520px; max-height: 86vh; overflow-y: auto;
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; padding: 22px; box-shadow: var(--shadow-sheet);
   }
   .kernel-item {
-    border: 1.5px solid var(--border); border-radius: 12px;
-    padding: 12px 14px; margin-bottom: 10px; cursor: pointer;
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    border: 1px solid var(--line); background: var(--sheet-soft);
+    border-radius: 6px; padding: 11px 13px; margin-bottom: 8px;
+    cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   }
-  .kernel-item.active { border-color: var(--primary); background: var(--primary-soft); }
-  .progress-track { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; margin-top: 8px; display: none; }
+  .kernel-item.active { border-color: var(--ink); background: var(--paper); }
+  .progress-track { height: 4px; border-radius: 2px; background: var(--well); overflow: hidden; margin-top: 8px; display: none; }
   .progress-track.show { display: block; }
-  .progress-fill { height: 100%; width: 0%; background: var(--primary); transition: width 0.2s; }
+  .progress-fill { height: 100%; width: 0%; background: var(--ink); transition: width 0.2s; }
 
-  /* ── Slide-over Drawer ─────────────────── */
-  .drawer-mask { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(15, 23, 42, 0.25); }
+  .drawer-mask { display: none; position: fixed; inset: 0; z-index: 80; background: rgba(20, 20, 19, 0.26); }
   .drawer-mask.show { display: block; }
   .drawer {
     position: fixed; top: 0; right: -400px; width: 380px; height: 100vh; z-index: 85;
-    background: var(--surface); border-left: 1px solid var(--border);
-    box-shadow: -12px 0 32px rgba(15, 23, 42, 0.14);
-    display: flex; flex-direction: column; padding: 18px 18px 16px;
+    background: var(--paper); border-left: 1px solid var(--line);
+    box-shadow: -12px 0 32px rgba(20, 20, 19, 0.14);
+    display: flex; flex-direction: column; padding: 18px;
     transition: right 0.2s ease;
   }
   .drawer.show { right: 0; }
 
   .toast {
-    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(16px);
-    background: #0f172a; color: #fff; padding: 9px 18px; border-radius: 999px;
-    font-size: 12.5px; font-weight: 500; opacity: 0; pointer-events: none;
-    transition: all 0.2s; z-index: 120; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(14px);
+    background: var(--btn-bg); color: var(--btn-fg); padding: 8px 16px; border-radius: 6px;
+    font-size: 12px; font-weight: 500; opacity: 0; pointer-events: none;
+    transition: all 0.18s; z-index: 120; box-shadow: 0 8px 24px rgba(0,0,0,0.22);
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* ── Responsive Tablet / Narrow Window (< 960px / <= 780px) ─ */
   @media (max-width: 960px) {
+    .auth-grid { grid-template-columns: 1fr; max-width: 440px; gap: 20px; }
+    .editorial-col { display: none; }
     .studio-grid { grid-template-columns: 1fr; }
-    .rail { width: 204px; min-width: 204px; }
+    .tool-dir-text { max-width: 84px; }
+  }
+
+  @media (max-width: 780px) {
+    .topbar { flex-wrap: wrap; padding: 6px 12px; gap: 6px; min-height: auto; }
+    .top-left, .top-right { width: 100%; justify-content: space-between; }
+    .top-left { border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    .vtick, .strip-meta { display: none; }
+    .brand { padding-right: 6px; }
+    .nav-tab { padding: 4px 8px; font-size: 12.5px; }
+    .index-strip { padding: 0 12px; height: 36px; min-height: 36px; }
+    .step-tabs { gap: 14px; width: 100%; justify-content: space-between; }
+    .scroll-body { padding: 16px 14px 24px; }
+    .brick-grid { grid-template-columns: 1fr; }
+    .filter-grid { grid-template-columns: 1fr; }
+    .course-grid { grid-template-columns: 1fr; }
+    .drawer { width: 100vw; right: -100vw; }
+    .activity-btn { max-width: 150px; }
   }
 </style>
 </head>
 <body>
-<div class="shell">
-  <!-- Slim Left Rail -->
-  <aside class="rail">
-    <div class="brand">
-      <div class="brand-mark">R</div>
-      <div>
-        <div class="brand-name">融智导出 Studio</div>
-        <div class="brand-sub">统一无损排版引擎</div>
+<div class="app">
+  <!-- Unified Precision Topbar -->
+  <header class="topbar">
+    <div class="top-left">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M4 8V4h4M16 4h4v4M4 16v4h4M16 20h4v-4"/>
+          <line x1="12" y1="7" x2="12" y2="17"/>
+          <line x1="7" y1="12" x2="17" y2="12"/>
+        </svg>
+        <span class="brand-name">融智云考 · 印务台</span>
       </div>
+      <span class="vtick"></span>
+      <nav class="top-nav" aria-label="主视图">
+        <button class="nav-tab active" data-view="workspace" onclick="switchView('workspace')">工作台</button>
+        <button class="nav-tab" data-view="history" onclick="switchView('history')">
+          归档库 <span class="tab-count" id="navTaskBadge" style="display:none">0</span>
+        </button>
+        <button class="nav-tab" data-view="logs" onclick="switchView('logs')">审校日志</button>
+      </nav>
     </div>
 
-    <nav class="nav-list" aria-label="主导航">
-      <button class="nav-item active" data-view="workspace" onclick="switchView('workspace')">
-        <span class="nav-item-left">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
-          导出工作台
-        </span>
-      </button>
-      <button class="nav-item" data-view="history" onclick="switchView('history')">
-        <span class="nav-item-left">
-          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          导出记录
-        </span>
-        <span class="nav-badge" id="navTaskBadge" style="display:none">0</span>
-      </button>
-      <button class="nav-item" data-view="logs" onclick="switchView('logs')">
-        <span class="nav-item-left">
-          <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          校验日志
-        </span>
-      </button>
-    </nav>
+    <div class="top-right">
+      <div class="session-chip" id="sessionPill">
+        <span class="dot"></span>
+        <span class="mono" id="sessionLabel">已接入</span>
+      </div>
+      <button class="btn btn-text" id="switchAccBtn" style="display:none;height:30px;font-size:12px;" onclick="signOut()">断开</button>
 
-    <div class="rail-spacer"></div>
-
-    <div class="rail-dock">
-      <button class="dock-btn" onclick="chooseExportDir()" title="点击更改默认导出位置">
-        <div class="dock-main">
-          <div class="dock-k">默认保存到 <span style="color:var(--primary)">更改</span></div>
-          <div class="dock-v" id="exportDirLabel">Documents/CCTRExport</div>
-        </div>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      </button>
-
-      <button class="dock-btn" onclick="openKernelModal()" title="切换或自动下载 Edge / Chrome / Chromium 渲染内核">
-        <div class="dock-main">
-          <div class="dock-k">PDF 渲染内核</div>
-          <div class="dock-v" id="kernelDockLabel">检测中…</div>
-        </div>
-        <span class="dock-dot" id="kernelDockDot"></span>
-      </button>
-
-      <div class="dock-row">
-        <button class="chip-mini" onclick="toggleTheme()" id="themeBtn">
-          <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-          深色
+      <div class="tool-group">
+        <button class="tool-btn" onclick="chooseExportDir()" title="更改默认输出文件夹">
+          <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          <span class="tool-dir-text" id="exportDirLabel">Documents/CCTRExport</span>
         </button>
-        <button class="chip-mini" onclick="bridge && bridge.openExportDir()">
+        <button class="tool-btn" style="padding:0 8px;" onclick="bridge && bridge.openExportDir()" title="打开输出文件夹">
           <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          目录
         </button>
       </div>
+
+      <button class="tool-btn" style="border:1px solid var(--line);border-radius:6px;background:var(--sheet-soft);" onclick="openKernelModal()" title="配置 PDF 与图片渲染引擎">
+        <span class="dot" id="kernelDockDot" style="color:var(--jade)"></span>
+        <span class="mono" style="font-size:11.5px;" id="kernelDockLabel">检测中</span>
+      </button>
+
+      <button class="activity-btn" id="activityPill" onclick="toggleDrawer(true)">
+        <span class="dot" id="activityDot" style="color:var(--ink-3)"></span>
+        <span class="activity-label" id="activityLabel">空闲</span>
+      </button>
+
+      <button class="icon-btn" onclick="toggleTheme()" id="themeBtn" title="切换浅色/深色主题" aria-label="切换主题">
+        <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
     </div>
-  </aside>
+  </header>
 
-  <!-- Main Workspace -->
-  <main class="main">
-    <header class="topbar">
-      <div class="topbar-left">
-        <h1 class="page-h" id="pageTitle">导出工作台</h1>
-        <div class="session-pill" id="sessionPill">
-          <span class="session-dot"></span>
-          <span id="sessionLabel">已连接</span>
-        </div>
-        <button class="btn btn-ghost" id="switchAccBtn" style="display:none;font-size:12px;" onclick="signOut()">切换账号</button>
-      </div>
-      <div class="topbar-right">
-        <button class="activity-pill" id="activityPill" onclick="toggleDrawer(true)">
-          <span id="activityDot" class="session-dot" style="background:var(--text-3)"></span>
-          <span id="activityLabel">暂无活动任务</span>
-        </button>
-      </div>
-    </header>
-
-    <div class="canvas" id="mainCanvas">
-      <!-- View 1: Workspace -->
-      <section class="view active" id="view-workspace">
-        <div class="stepper" id="stepper">
-          <button class="step-chip active" id="stepChip0" onclick="tryGoStep(0)">
-            <span class="num">1</span> 连接账号
+  <!-- Main Stage -->
+  <main class="stage">
+    <!-- View 1: Workspace -->
+    <section class="view active" id="view-workspace">
+      <div class="index-strip">
+        <div class="step-tabs">
+          <button class="step-tab active" id="stepChip0" onclick="tryGoStep(0)">
+            <span class="idx">01</span> 身份接入
           </button>
-          <span class="step-line"></span>
-          <button class="step-chip" id="stepChip1" onclick="tryGoStep(1)" disabled>
-            <span class="num">2</span> 选择练习
+          <button class="step-tab" id="stepChip1" onclick="tryGoStep(1)" disabled>
+            <span class="idx">02</span> 课程遴选
           </button>
-          <span class="step-line"></span>
-          <button class="step-chip" id="stepChip2" onclick="tryGoStep(2)" disabled>
-            <span class="num">3</span> 排版与导出
+          <button class="step-tab" id="stepChip2" onclick="tryGoStep(2)" disabled>
+            <span class="idx">03</span> 版式付印
           </button>
         </div>
+        <div class="strip-meta">
+          <span>A4 · 18mm</span>
+          <span>/</span>
+          <span>10.5pt · Wiris 0.86×</span>
+        </div>
+      </div>
 
-        <!-- Step 0: Calm Sign-In -->
+      <div class="scroll-body">
+        <!-- Step 0: Editorial Auth -->
         <div class="auth-wrap" id="paneStep0">
-          <div class="auth-card">
-            <div class="auth-title">连接融智云考账号</div>
-            <div class="auth-sub">本地直连拉取题库，验证码自动识别，导出期间保持登录不掉线。</div>
-
-            <div class="field">
-              <label for="schoolInput">学校代码</label>
-              <input class="input" id="schoolInput" placeholder="例如 u101441" autocomplete="organization">
-            </div>
-            <div class="field">
-              <label for="userInput">学号 / 账号</label>
-              <input class="input" id="userInput" placeholder="输入学号或登录账号" autocomplete="username">
-            </div>
-            <div class="field">
-              <label for="passInput">密码</label>
-              <div class="input-box">
-                <input class="input" id="passInput" type="password" placeholder="输入登录密码" style="padding-right:38px" autocomplete="current-password">
-                <button type="button" class="eye-btn" onclick="togglePassword()" aria-label="显示或隐藏密码">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                </button>
-              </div>
-            </div>
-            <div class="field" style="margin-bottom:20px;">
-              <label for="captchaInput">
-                <span>图形验证码</span>
-                <span class="ocr-tag wait" id="ocrStatusTag">等待加载…</span>
-              </label>
-              <div class="captcha-group">
-                <input class="captcha-input" id="captchaInput" placeholder="自动填入或手动输入">
-                <div class="captcha-img-wrap" onclick="refreshCaptcha()" title="点击刷新验证码并重新识别">
-                  <img id="captchaImg" alt="图形验证码">
-                  <span id="captchaPlaceholder" style="font-size:11px;color:#64748b;">加载中</span>
+          <div class="auth-grid">
+            <div class="editorial-col">
+              <div class="editorial-kicker">ISO 216 · A4 Typesetting Workbench</div>
+              <h1 class="editorial-h">无损题库印务与排版系统</h1>
+              <p class="editorial-desc">
+                直连学校题库接口并逐题核对完整性，清洗 Word 智能标签与杂乱样式，按统一 10.5pt 视觉标准生成可打印的 A4 讲义与分类归档。
+              </p>
+              <div class="spec-ledger">
+                <div class="spec-ledger-row">
+                  <span class="no">01</span>
+                  <span class="k">版面基准</span>
+                  <span class="v">ISO A4 (210×297 mm) · 四周 18 mm 留白</span>
+                </div>
+                <div class="spec-ledger-row">
+                  <span class="no">02</span>
+                  <span class="k">字号与公式</span>
+                  <span class="v">10.5pt 正文 · Wiris 0.86× · OSS 直连预内联</span>
+                </div>
+                <div class="spec-ledger-row">
+                  <span class="no">03</span>
+                  <span class="k">端侧安全</span>
+                  <span class="v">本地直连 · 离线 OCR 识别 · 导出后保持会话</span>
                 </div>
               </div>
             </div>
 
-            <button class="btn btn-primary" id="loginBtn" style="width:100%;height:42px;font-size:14px;" onclick="submitLogin()">
-              登录并获取课程练习
-            </button>
-            <div class="banner-err" id="loginErr"></div>
+            <div class="auth-sheet">
+              <div class="sheet-head">
+                <h2>连接学校账号</h2>
+                <span>SESSION AUTH</span>
+              </div>
+
+              <div class="field">
+                <label for="schoolInput">学校代码</label>
+                <input class="input" id="schoolInput" placeholder="例如 u101441" autocomplete="organization">
+              </div>
+              <div class="field">
+                <label for="userInput">学号 / 账号</label>
+                <input class="input" id="userInput" placeholder="输入学号或登录账号" autocomplete="username">
+              </div>
+              <div class="field">
+                <label for="passInput">密码</label>
+                <div class="input-wrap">
+                  <input class="input" id="passInput" type="password" placeholder="输入登录密码" style="padding-right:34px" autocomplete="current-password">
+                  <button type="button" class="eye-btn" onclick="togglePassword()" aria-label="显示或隐藏密码">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="field" style="margin-bottom:20px;">
+                <label for="captchaInput">
+                  <span>图形验证码</span>
+                  <span class="ocr-note wait" id="ocrStatusTag">等待加载…</span>
+                </label>
+                <div class="captcha-box">
+                  <input class="captcha-input" id="captchaInput" placeholder="自动识别或手动输入">
+                  <div class="captcha-img-cell" onclick="refreshCaptcha()" title="点击刷新验证码并重新识别">
+                    <img id="captchaImg" alt="图形验证码">
+                    <span id="captchaPlaceholder" class="mono" style="font-size:10.5px;color:#6e6b65;">加载中</span>
+                  </div>
+                </div>
+              </div>
+
+              <button class="btn btn-carbon" id="loginBtn" style="width:100%;height:40px;font-size:13px;" onclick="submitLogin()">
+                连接并载入题库
+              </button>
+              <div class="err-strip" id="loginErr"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Step 1: Course & Practice Picker -->
+        <!-- Step 1: Course Picker -->
         <div class="container" id="paneStep1" style="display:none;">
-          <div class="toolbar-row">
-            <div class="search-wrap">
+          <div class="toolbar">
+            <div class="search-box">
               <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="input" id="courseSearch" placeholder="按课程名称、练习名称或教师筛选…" oninput="renderPracticeGrid()">
             </div>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-soft" onclick="selectAllPractices(true)">全选当前</button>
-              <button class="btn btn-soft" onclick="selectAllPractices(false)">清空选择</button>
-              <button class="btn btn-ghost" onclick="refreshPractices()">刷新列表</button>
+              <button class="btn btn-outline" onclick="selectAllPractices(true)">全选当前</button>
+              <button class="btn btn-outline" onclick="selectAllPractices(false)">清空</button>
+              <button class="btn btn-text" onclick="refreshPractices()">刷新</button>
             </div>
           </div>
 
           <div class="course-grid" id="practiceGrid"></div>
 
-          <div class="sticky-footer">
-            <div style="font-size:13px;color:var(--text-2);" id="selectedSummary">请选择至少一项课程练习</div>
-            <button class="btn btn-primary" id="toStep2Btn" disabled onclick="goStep(2)">
-              下一步：排版与导出 →
+          <div class="settlement-bar">
+            <div class="mono" style="font-size:12px;color:var(--ink-2);" id="selectedSummary">请选择至少一项课程练习</div>
+            <button class="btn btn-carbon" id="toStep2Btn" disabled onclick="goStep(2)">
+              进入版式与付印设置 →
             </button>
           </div>
         </div>
 
-        <!-- Step 2: Export Studio (No Auto-Reset!) -->
+        <!-- Step 2: Export Press Bench -->
         <div class="container" id="paneStep2" style="display:none;">
           <div class="result-banner" id="resultBanner">
-            <div class="result-info">
+            <div style="min-width:0;flex:1;">
               <div class="result-title" id="resultTitle">正在准备导出…</div>
-              <div class="result-sub" id="resultSub">完成后会保留当前登录与选课状态，可直接切换格式再次导出。</div>
+              <div class="result-sub" id="resultSub">导出完成后保留登录态与课程选择，可直接切换版式再次生成。</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center;" id="resultActions"></div>
           </div>
 
           <div class="studio-grid">
             <div class="panel">
-              <div class="panel-title">
-                <span>导出格式与范围设置</span>
-                <span style="font-size:12px;font-weight:500;color:var(--text-2);" id="studioScopeBadge"></span>
+              <div class="panel-head">
+                <h3>付印参数与范围</h3>
+                <span id="studioScopeBadge">0 项练习</span>
               </div>
 
-              <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">导出形式</div>
-              <div class="opt-grid-3">
-                <button class="seg-card active" data-fmt="pdf" onclick="setFormat('pdf')">
+              <span class="sec-label">交付载体</span>
+              <div class="brick-grid">
+                <button class="brick active" data-fmt="pdf" onclick="setFormat('pdf')">
                   <strong>A4 合并 PDF</strong>
-                  <span>全量整洁合集</span>
+                  <span>全量连续合集</span>
                 </button>
-                <button class="seg-card" data-fmt="zip" onclick="setFormat('zip')">
-                  <strong>分类 ZIP 归档</strong>
-                  <span>分卷 + 校验清单</span>
+                <button class="brick" data-fmt="zip" onclick="setFormat('zip')">
+                  <strong>分类归档 ZIP</strong>
+                  <span>分卷与校验清单</span>
                 </button>
-                <button class="seg-card" data-fmt="img" onclick="setFormat('img')">
-                  <strong>高清 PNG 图包</strong>
-                  <span>逐题截图打包</span>
+                <button class="brick" data-fmt="img" onclick="setFormat('img')">
+                  <strong>逐题 PNG 图包</strong>
+                  <span>高清切片归档</span>
                 </button>
               </div>
 
-              <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">答案展示方式</div>
-              <div class="pill-row">
-                <button class="choice-pill active" data-var="withAnswersRed" onclick="setVariant('withAnswersRed')">红标答案与解析</button>
-                <button class="choice-pill" data-var="withAnswersPlain" onclick="setVariant('withAnswersPlain')">普通黑字答案</button>
-                <button class="choice-pill" data-var="withoutAnswers" onclick="setVariant('withoutAnswers')">纯题面刷题版</button>
+              <span class="sec-label">答案批注版式</span>
+              <div class="seg-track">
+                <button class="seg-btn active" data-var="withAnswersRed" onclick="setVariant('withAnswersRed')">朱批红标</button>
+                <button class="seg-btn" data-var="withAnswersPlain" onclick="setVariant('withAnswersPlain')">墨字附答</button>
+                <button class="seg-btn" data-var="withoutAnswers" onclick="setVariant('withoutAnswers')">空白试卷</button>
               </div>
 
               <div id="singleFiltersWrap" style="display:none;">
                 <div class="filter-grid">
                   <div>
-                    <label style="display:block;font-size:11.5px;color:var(--text-2);margin-bottom:5px;">按章节过滤</label>
+                    <label class="sec-label" for="chapterSel">章节筛选</label>
                     <select class="select" id="chapterSel"><option value="">全部章节</option></select>
                   </div>
                   <div>
-                    <label style="display:block;font-size:11.5px;color:var(--text-2);margin-bottom:5px;">按题型过滤</label>
+                    <label class="sec-label" for="qtypeSel">题型筛选</label>
                     <select class="select" id="qtypeSel"><option value="">全部题型</option></select>
                   </div>
                 </div>
               </div>
 
-              <label class="switch-row">
-                <div>
-                  <div style="font-size:13px;font-weight:600;">智能防隔页分页（推荐）</div>
-                  <div style="font-size:11.5px;color:var(--text-3);">小题整题不跨页拆散；超长单题页内接续，下题另起一页</div>
-                </div>
-                <input type="checkbox" id="smartPagination" checked onchange="updatePreviewCard()">
-              </label>
+              <div class="toggle-list">
+                <label class="toggle-row">
+                  <div>
+                    <div class="toggle-title">智能防隔页分页</div>
+                    <div class="toggle-desc">小题整题不跨页拆散；超长单题页内接续后下题另起一页</div>
+                  </div>
+                  <span class="switch">
+                    <input type="checkbox" id="smartPagination" checked onchange="updatePreviewCard()">
+                    <span class="switch-track"></span>
+                  </span>
+                </label>
 
-              <label class="switch-row">
-                <div>
-                  <div style="font-size:13px;font-weight:600;">仅导出已练习题目</div>
-                  <div style="font-size:11.5px;color:var(--text-3);">关闭时将同时拉取未练与已练全部题目并核对总数</div>
-                </div>
-                <input type="checkbox" id="practicedOnly">
-              </label>
+                <label class="toggle-row">
+                  <div>
+                    <div class="toggle-title">仅导出已练习题目</div>
+                    <div class="toggle-desc">关闭时同步拉取未练与已练全部题目并核对总数</div>
+                  </div>
+                  <span class="switch">
+                    <input type="checkbox" id="practicedOnly">
+                    <span class="switch-track"></span>
+                  </span>
+                </label>
+              </div>
 
               <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;">
-                <button class="btn btn-soft" onclick="goStep(1)">← 修改所选练习</button>
-                <button class="btn btn-primary" style="min-width:168px;height:40px;" id="exportBtn" onclick="submitExport()">
-                  开始无损导出
+                <button class="btn btn-outline" onclick="goStep(1)">返回重选</button>
+                <button class="btn btn-carbon" style="min-width:176px;height:40px;" id="exportBtn" onclick="submitExport()">
+                  开始生成并校验文档
                 </button>
               </div>
             </div>
 
-            <!-- Live A4 Preview Card -->
+            <!-- Live A4 Specimen Bench -->
             <div class="panel">
-              <div class="panel-title">
-                <span>A4 排版预览</span>
-                <span style="font-size:11px;font-weight:600;color:var(--ok);">字号公式等比已开启</span>
+              <div class="panel-head">
+                <h3>A4 实样校对台</h3>
+                <span style="color:var(--jade);">10.5PT UNIFORM</span>
               </div>
-              <div class="paper-stage">
-                <div class="a4-sheet">
-                  <div class="a4-h2">示例课程 / 导论与计算</div>
+
+              <div class="cutting-mat">
+                <div class="a4-paper">
+                  <span class="crop tl"></span><span class="crop tr"></span>
+                  <span class="crop bl"></span><span class="crop br"></span>
+
+                  <div class="a4-h2">
+                    <span>示例讲义 · 导论与计算</span>
+                    <span class="mono" style="font-size:10px;color:#8a867e;">210×297 mm</span>
+                  </div>
                   <div class="a4-qh">第 1 题 <span>(2683548)</span></div>
-                  <div>某系统矢量场公式 <em>E</em> 与正文字号保持严格一致的 10.5pt 视觉比例：</div>
-                  <div class="a4-opt" id="prevOptA">A. 忽略公式放大直接截图</div>
-                  <div class="a4-opt red" id="prevOptB">B. 统一正文字号并等比缩放高分公式图</div>
-                  <div id="prevAnswerBlock">
-                    <span class="a4-tag">答案</span>
-                    <div style="margin-top:3px;color:#334155;">B · 附自动对齐解析与零裁剪图片校验</div>
+                  <div>某系统矢量场公式 <em>E</em> 与正文保持严格统一的 10.5pt 视觉比例：</div>
+                  <div class="a4-opt" id="prevOptA">A. 忽略公式缩放直接拼接</div>
+                  <div class="a4-opt red" id="prevOptB">B. 剥离杂乱样式并等比校准 Wiris 公式</div>
+                  <div class="a4-ans" id="prevAnswerBlock">
+                    <span class="a4-ans-tag red" id="prevAnsTag">答案 · B</span>
+                    <div style="margin-top:4px;color:#57544e;">附对齐解析，导出前已预内联 OSS 图片并校验零溢出。</div>
                   </div>
                 </div>
               </div>
 
-              <div class="spec-list">
-                <div class="spec-item"><span>纸张与留白</span><strong>标准 A4 · 四周 18mm</strong></div>
-                <div class="spec-item"><span>防隔页分页</span><strong id="studioPagSpec">已开启 · 小题整题不跨页</strong></div>
-                <div class="spec-item"><span>保存目录</span><strong id="studioOutDir" style="max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Documents/CCTRExport</strong></div>
-                <div class="spec-item"><span>目录整洁策略</span><strong>直接输出成品文件，无空子目录</strong></div>
+              <div class="meta-ledger">
+                <div class="meta-row"><span>版面规范</span><strong>ISO A4 · 四周 18 mm 留白</strong></div>
+                <div class="meta-row"><span>分页规则</span><strong id="studioPagSpec">已开启 · 小题整题不跨页</strong></div>
+                <div class="meta-row"><span>输出目录</span><strong id="studioOutDir" style="max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Documents/CCTRExport</strong></div>
+                <div class="meta-row"><span>归档约束</span><strong>直接输出成品，零空子目录</strong></div>
               </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- View 2: History & Files -->
-      <section class="view" id="view-history">
+    <!-- View 2: Archive History -->
+    <section class="view" id="view-history">
+      <div class="scroll-body">
         <div class="container">
-          <div class="toolbar-row">
-            <div style="font-size:13px;color:var(--text-2);" id="historySummary">已保存的全部导出文件记录</div>
-            <div style="display:flex;gap:8px;">
-              <button class="btn btn-soft" onclick="bridge && bridge.openExportDir()">打开导出文件夹</button>
-            </div>
+          <div class="toolbar">
+            <div class="mono" style="font-size:12px;color:var(--ink-2);" id="historySummary">已保存的全部导出文件记录</div>
+            <button class="btn btn-outline" onclick="bridge && bridge.openExportDir()">打开输出目录</button>
           </div>
           <div id="historyList"></div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- View 3: Full Logs (Zero Jump-To-Top!) -->
-      <section class="view" id="view-logs">
-        <div class="container" style="flex:1;">
-          <div class="toolbar-row">
-            <div style="font-size:13px;color:var(--text-2);">实时完整性校验、分页核对与内核调度日志</div>
+    <!-- View 3: Audit Logs -->
+    <section class="view" id="view-logs">
+      <div class="scroll-body">
+        <div class="container">
+          <div class="toolbar">
+            <div class="mono" style="font-size:12px;color:var(--ink-2);">完整性核对、图片预内联与内核调度日志</div>
             <div style="display:flex;gap:8px;">
-              <button class="btn btn-soft" onclick="copyLogs()">复制日志</button>
-              <button class="btn btn-soft" onclick="clearLogs()">清空日志</button>
+              <button class="btn btn-outline" onclick="copyLogs()">复制日志</button>
+              <button class="btn btn-outline" onclick="clearLogs()">清空日志</button>
             </div>
           </div>
           <div class="log-console" id="fullLogBox"></div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
   </main>
 </div>
 
 <!-- Activity Slide-over Drawer -->
 <div class="drawer-mask" id="drawerMask" onclick="toggleDrawer(false)"></div>
 <aside class="drawer" id="activityDrawer">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-    <strong style="font-size:15px;">最近任务与日志</strong>
-    <button class="btn btn-ghost" onclick="toggleDrawer(false)">关闭</button>
+  <div style="display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line);">
+    <strong style="font-size:14px;">队列与最近校验</strong>
+    <button class="btn btn-text" onclick="toggleDrawer(false)">关闭</button>
   </div>
-  <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;">最近导出</div>
-  <div id="drawerTasks" style="max-height:46%;overflow-y:auto;margin-bottom:14px;"></div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:12px;font-weight:600;color:var(--text-2);">最新日志</span>
-    <button class="btn btn-ghost" style="font-size:11.5px;padding:3px 7px;" onclick="toggleDrawer(false);switchView('logs')">查看完整日志</button>
+  <div class="mono" style="font-size:11px;color:var(--ink-3);margin-bottom:8px;">RECENT TASKS</div>
+  <div id="drawerTasks" style="max-height:44%;overflow-y:auto;margin-bottom:14px;"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <span class="mono" style="font-size:11px;color:var(--ink-3);">LIVE LOG</span>
+    <button class="btn btn-text" style="height:26px;font-size:11.5px;" onclick="toggleDrawer(false);switchView('logs')">查看完整日志</button>
   </div>
-  <div class="log-console" id="drawerLogBox" style="min-height:140px;font-size:11.5px;padding:10px 12px;"></div>
+  <div class="log-console" id="drawerLogBox" style="min-height:140px;font-size:11px;padding:10px 12px;"></div>
 </aside>
 
-<!-- Kernel Manager Modal -->
+<!-- Kernel Modal -->
 <div class="modal-mask" id="kernelModal" onclick="if(event.target===this)closeKernelModal()">
   <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <strong style="font-size:16px;">PDF / 图片渲染内核设置</strong>
-      <button class="btn btn-ghost" onclick="closeKernelModal()">关闭</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid var(--line);">
+      <strong style="font-size:15px;">PDF 与图像渲染引擎</strong>
+      <button class="btn btn-text" onclick="closeKernelModal()">关闭</button>
     </div>
-    <div style="font-size:12.5px;color:var(--text-2);margin-bottom:16px;">
-      优先复用系统已安装的 Edge / Chrome，也可一键自动下载便携 Chromium。
+    <div style="font-size:12.5px;color:var(--ink-2);margin-bottom:14px;">
+      优先复用本机 Edge / Chrome 无头渲染，或自动下载便携版 Chromium。
     </div>
     <div id="kernelList"></div>
     <div class="progress-track" id="kernelProgTrack"><div class="progress-fill" id="kernelProgFill"></div></div>
-    <div id="kernelProgMsg" style="font-size:12px;color:var(--text-2);margin-top:6px;"></div>
+    <div id="kernelProgMsg" class="mono" style="font-size:11.5px;color:var(--ink-2);margin-top:6px;"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
-      <button class="btn btn-soft" onclick="detectKernels()">重新检测本机</button>
-      <button class="btn btn-primary" id="dlKernelBtn" onclick="downloadKernel()">安装/下载所选内核</button>
+      <button class="btn btn-outline" onclick="detectKernels()">重新检测</button>
+      <button class="btn btn-carbon" id="dlKernelBtn" onclick="downloadKernel()">安装所选内核</button>
     </div>
   </div>
 </div>
@@ -847,7 +1001,7 @@ let bridge = null;
 let currentView = 'workspace';
 let currentStep = 0;
 let isLoggedIn = false;
-let sessionAccount = null; // { school, username, password }
+let sessionAccount = null;
 let practices = [];
 let selectedIds = new Set();
 let exportFmt = 'pdf';
@@ -882,8 +1036,8 @@ function shortPathLabel(p) {
 function applyTheme(dark) {
   document.documentElement.classList.toggle('dark', !!dark);
   qs('themeBtn').innerHTML = dark
-    ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/></svg>浅色'
-    : '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>深色';
+    ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 }
 
 function toggleTheme() {
@@ -899,10 +1053,8 @@ function togglePassword() {
 
 function switchView(view) {
   currentView = view;
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + view));
-  const titles = { workspace: '导出工作台', history: '导出记录与文件', logs: '完整性校验日志' };
-  qs('pageTitle').textContent = titles[view] || '导出工作台';
 }
 
 function toggleDrawer(show) {
@@ -941,7 +1093,7 @@ function goStep(step) {
 function refreshCaptcha() {
   if (!bridge) return;
   qs('ocrStatusTag').textContent = '识别中…';
-  qs('ocrStatusTag').className = 'ocr-tag wait';
+  qs('ocrStatusTag').className = 'ocr-note wait';
   qs('captchaPlaceholder').style.display = 'inline';
   qs('captchaImg').style.display = 'none';
   bridge.fetchCaptcha();
@@ -962,7 +1114,7 @@ function submitLogin() {
   }
   const btn = qs('loginBtn');
   btn.disabled = true;
-  btn.textContent = '正在连接并校验练习列表…';
+  btn.textContent = '正在校验会话并拉取目录…';
   sessionAccount = { school, username: user, password: pass };
   bridge.login(school, user, pass, captcha, true);
 }
@@ -980,7 +1132,7 @@ function signOut() {
   qs('captchaInput').value = '';
   goStep(0);
   refreshCaptcha();
-  showToast('已安全退出当前账号');
+  showToast('已安全断开当前账号');
 }
 
 /* ── Practices Grid ────────────────────── */
@@ -997,17 +1149,17 @@ function renderPracticeGrid() {
   } else {
     grid.innerHTML = list.map(p => {
       const sel = selectedIds.has(String(p.id));
-      const cnt = p.question_count != null ? `${p.question_count} 题` : '待统计';
+      const cnt = p.question_count != null ? `${p.question_count} 题` : '待核';
       return `
         <div class="course-card ${sel ? 'selected' : ''}" onclick="togglePractice('${escapeHtml(p.id)}')">
-          <div class="check-ring"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="sq-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
           <div class="course-body">
-            <div class="course-title">${escapeHtml(p.lesson_name || p.practice_name)}</div>
-            <div class="course-sub">${escapeHtml(p.practice_name)}</div>
-            <div class="course-meta">
-              <span class="q-pill">${cnt}</span>
-              ${p.teacher_name ? `<span>${escapeHtml(p.teacher_name)}</span>` : ''}
+            <div class="course-top">
+              <div class="course-title">${escapeHtml(p.lesson_name || p.practice_name)}</div>
+              <span class="q-tag">${cnt}</span>
             </div>
+            <div class="course-sub">${escapeHtml(p.practice_name)}</div>
+            ${p.teacher_name ? `<div class="course-foot">教师 · ${escapeHtml(p.teacher_name)}</div>` : ''}
           </div>
         </div>
       `;
@@ -1041,7 +1193,7 @@ function updateSelectedSummary() {
   const chosen = practices.filter(p => selectedIds.has(String(p.id)));
   const totalQ = chosen.reduce((acc, p) => acc + (Number(p.question_count) || 0), 0);
   qs('selectedSummary').textContent = chosen.length
-    ? `已选 ${chosen.length} 项练习（约 ${totalQ} 道题）`
+    ? `已选 ${chosen.length} 项练习 · 约 ${totalQ} 道题`
     : '请选择至少一项课程练习';
   qs('toStep2Btn').disabled = chosen.length === 0;
   qs('stepChip2').disabled = chosen.length === 0;
@@ -1049,26 +1201,29 @@ function updateSelectedSummary() {
 
 function refreshPractices() {
   if (!sessionAccount || !bridge) return;
-  showToast('正在刷新课程练习列表…');
+  showToast('正在刷新课程目录…');
   bridge.login(sessionAccount.school, sessionAccount.username, sessionAccount.password, '', true);
 }
 
-/* ── Export Studio ─────────────────────── */
+/* ── Export Press Bench ────────────────── */
 function setFormat(fmt) {
   exportFmt = fmt;
-  document.querySelectorAll('.seg-card').forEach(c => c.classList.toggle('active', c.dataset.fmt === fmt));
+  document.querySelectorAll('.brick').forEach(c => c.classList.toggle('active', c.dataset.fmt === fmt));
 }
 
 function setVariant(v) {
   exportVariant = v;
-  document.querySelectorAll('.choice-pill').forEach(p => p.classList.toggle('active', p.dataset.var === v));
+  document.querySelectorAll('.seg-btn').forEach(p => p.classList.toggle('active', p.dataset.var === v));
   updatePreviewCard();
 }
 
 function updatePreviewCard() {
   const optB = qs('prevOptB');
   const ans = qs('prevAnswerBlock');
-  optB.classList.toggle('red', exportVariant === 'withAnswersRed');
+  const tag = qs('prevAnsTag');
+  const isRed = exportVariant === 'withAnswersRed';
+  optB.classList.toggle('red', isRed);
+  if (tag) tag.classList.toggle('red', isRed);
   ans.style.display = exportVariant === 'withoutAnswers' ? 'none' : 'block';
   const pagEl = qs('studioPagSpec');
   if (pagEl) {
@@ -1116,10 +1271,9 @@ function submitExport() {
       showToast(res.error || '提交失败');
       return;
     }
-    // 关键改进：绝不退出登录、绝不跳回第一步、绝不清空已选课程！
     activeTaskId = res.taskId;
     renderResultBanner();
-    showToast(`任务 #${res.taskId} 已开始导出，请稍候…`);
+    showToast(`任务 #${res.taskId} 已开始处理`);
   });
 }
 
@@ -1136,21 +1290,21 @@ function renderResultBanner() {
 
   if (t.status === 'success') {
     banner.classList.add('ok');
-    titleEl.textContent = `✓ 已完成导出：${t.file_name || t.title}`;
-    subEl.textContent = `${t.file_size ? t.file_size + ' · ' : ''}当前仍保持已登录状态，您可以直接更改格式或返回重新选课。`;
+    titleEl.textContent = `完成导出：${t.file_name || t.title}`;
+    subEl.textContent = `${t.file_size ? t.file_size + ' · ' : ''}当前仍保持已连接状态，可直接切换载体或版式继续生成。`;
     actEl.innerHTML = `
-      <button class="btn btn-primary" onclick="bridge.openTaskFile(${t.id})">打开文件</button>
-      <button class="btn btn-soft" onclick="bridge.openTaskDir(${t.id})">在文件夹中显示</button>
+      <button class="btn btn-carbon" onclick="bridge.openTaskFile(${t.id})">打开成稿</button>
+      <button class="btn btn-outline" onclick="bridge.openTaskDir(${t.id})">定位目录</button>
     `;
   } else if (t.status === 'failed') {
     banner.classList.add('err');
-    titleEl.textContent = `✕ 任务 #${t.id} 导出失败`;
-    subEl.textContent = '请查看校验日志定位具体原因，或切换渲染内核后重试。';
-    actEl.innerHTML = `<button class="btn btn-soft" onclick="switchView('logs')">查看校验日志</button>`;
+    titleEl.textContent = `任务 #${t.id} 导出失败`;
+    subEl.textContent = '请查看审校日志排查详细报错，或切换渲染引擎后重试。';
+    actEl.innerHTML = `<button class="btn btn-outline" onclick="switchView('logs')">查看审校日志</button>`;
   } else {
-    titleEl.textContent = `⏳ 正在后台生成：${t.title}`;
-    subEl.textContent = '正在核对题目总数、等比缩放公式截图并生成 A4 排版…';
-    actEl.innerHTML = `<button class="btn btn-soft" onclick="toggleDrawer(true)">查看进度</button>`;
+    titleEl.textContent = `正在后台制版：${t.title}`;
+    subEl.textContent = '正在核对题目总数、直连内联远程图片并执行 A4 分页校验…';
+    actEl.innerHTML = `<button class="btn btn-outline" onclick="toggleDrawer(true)">查看进度</button>`;
   }
 }
 
@@ -1168,7 +1322,7 @@ function chooseExportDir() {
     const res = JSON.parse(resStr);
     if (res.ok && res.exportDir) {
       applyExportDirUI(res.exportDir);
-      showToast('已更新默认导出目录');
+      showToast('已更新默认输出目录');
     }
   });
 }
@@ -1178,7 +1332,7 @@ function applyKernelState(k) {
   const pref = kernelsState.preferred || 'auto';
   const item = (kernelsState.items || {})[pref] || (kernelsState.items || {}).auto || {};
   qs('kernelDockLabel').textContent = item.name ? `${item.name}${item.version ? ' ' + item.version.split('.')[0] : ''}` : '自动优选';
-  qs('kernelDockDot').classList.toggle('warn', !item.installed);
+  qs('kernelDockDot').style.color = item.installed ? 'var(--jade)' : 'var(--amber)';
   renderKernelModalList();
 }
 
@@ -1197,15 +1351,15 @@ function renderKernelModalList() {
   list.innerHTML = labels.map(l => {
     const info = items[l.key] || {};
     const statusText = info.installed
-      ? `<span style="color:var(--ok);font-weight:600;">已就绪${info.version ? ' · ' + escapeHtml(info.version) : ''}</span>`
-      : `<span style="color:var(--warn);font-weight:600;">未安装${info.can_download ? '（支持自动下载）' : ''}</span>`;
+      ? `<span class="mono" style="color:var(--jade);font-weight:600;">就绪${info.version ? ' · ' + escapeHtml(info.version) : ''}</span>`
+      : `<span class="mono" style="color:var(--amber);font-weight:600;">未安装${info.can_download ? '（可下载）' : ''}</span>`;
     return `
       <div class="kernel-item ${pref === l.key ? 'active' : ''}" onclick="selectKernel('${l.key}')">
         <div>
-          <div style="font-weight:600;font-size:13px;">${escapeHtml(l.label)}</div>
-          <div style="font-size:11.5px;color:var(--text-3);margin-top:2px;">${escapeHtml(info.path || info.source || '')}</div>
+          <div style="font-weight:600;font-size:12.5px;">${escapeHtml(l.label)}</div>
+          <div class="mono" style="font-size:11px;color:var(--ink-3);margin-top:2px;">${escapeHtml(info.path || info.source || '')}</div>
         </div>
-        <div style="font-size:12px;white-space:nowrap;">${statusText}</div>
+        <div style="font-size:11.5px;white-space:nowrap;">${statusText}</div>
       </div>
     `;
   }).join('');
@@ -1232,7 +1386,7 @@ function downloadKernel() {
   bridge.downloadKernel(kernelsState.preferred || 'chromium');
 }
 
-/* ── State Sync (Zero Flicker & Smart Scroll!) ─ */
+/* ── State Sync ────────────────────────── */
 function renderStatePayload(data) {
   tasksCache = data.tasks || [];
   logsCache = data.logs || [];
@@ -1261,46 +1415,46 @@ function renderTasksUI() {
   pill.classList.toggle('busy', busy > 0);
   if (busy > 0) {
     qs('activityDot').className = 'pulse';
-    qs('activityLabel').textContent = `正在导出 (${busy})`;
+    qs('activityLabel').textContent = `制版中 (${busy})`;
   } else if (tasksCache.length) {
-    qs('activityDot').className = 'session-dot';
-    qs('activityDot').style.background = tasksCache[0].status === 'success' ? 'var(--ok)' : 'var(--err)';
-    qs('activityLabel').textContent = `最近：${tasksCache[0].file_name || tasksCache[0].title}`;
+    qs('activityDot').className = 'dot';
+    qs('activityDot').style.color = tasksCache[0].status === 'success' ? 'var(--jade)' : 'var(--vermilion)';
+    qs('activityLabel').textContent = tasksCache[0].file_name || tasksCache[0].title;
   } else {
-    qs('activityDot').className = 'session-dot';
-    qs('activityDot').style.background = 'var(--text-3)';
-    qs('activityLabel').textContent = '暂无活动任务';
+    qs('activityDot').className = 'dot';
+    qs('activityDot').style.color = 'var(--ink-3)';
+    qs('activityLabel').textContent = '空闲';
   }
 
-  const fmtNames = { pdf: '合并 PDF', zip: '分类 ZIP', img: 'PNG 图包' };
-  const statusLabels = { success: '已完成', processing: '导出中', waiting: '队列中', failed: '失败' };
+  const fmtNames = { pdf: 'A4 PDF', zip: '分类 ZIP', img: 'PNG 图包' };
+  const statusLabels = { success: '完成', processing: '制版中', waiting: '队列中', failed: '失败' };
   qs('historySummary').textContent = tasksCache.length
-    ? `共 ${tasksCache.length} 条记录（导出文件保存在您设定的文件夹中）`
-    : '暂无导出记录';
+    ? `共 ${tasksCache.length} 条归档记录`
+    : '暂无归档记录';
 
   const histBox = qs('historyList');
   if (!tasksCache.length) {
-    histBox.innerHTML = '<div class="empty-state">还没有导出记录，在“导出工作台”提交任务后会显示在这里。</div>';
+    histBox.innerHTML = '<div class="empty-state">尚无导出成稿记录，在“工作台”提交导出后将在此归档。</div>';
   } else {
     histBox.innerHTML = tasksCache.map(t => `
-      <div class="task-row">
-        <div class="task-left">
-          <div class="task-head">
-            <span class="task-title">${escapeHtml(t.file_name || t.title)}</span>
-            <span class="badge ${t.status}">${statusLabels[t.status] || t.status}</span>
-            <span style="font-size:11.5px;color:var(--text-2);">${fmtNames[t.export_type] || t.export_type}</span>
+      <div class="ledger-row">
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="ledger-title">${escapeHtml(t.file_name || t.title)}</span>
+            <span class="status-tag ${t.status}">${statusLabels[t.status] || t.status}</span>
+            <span class="mono" style="font-size:11px;color:var(--ink-3);">${fmtNames[t.export_type] || t.export_type}</span>
           </div>
-          <div class="task-meta">
+          <div class="ledger-meta">
             ${escapeHtml(t.create_time)}${t.file_size ? ' · ' + escapeHtml(t.file_size) : ''}${t.file_path ? ' · ' + escapeHtml(t.file_path) : ''}
           </div>
         </div>
-        <div class="task-actions">
+        <div style="display:flex;align-items:center;gap:8px;">
           ${t.status === 'success' ? `
-            <button class="btn btn-primary" style="padding:6px 12px;font-size:12px;" onclick="bridge.openTaskFile(${t.id})">打开文件</button>
-            <button class="btn btn-soft" style="padding:6px 12px;font-size:12px;" onclick="bridge.openTaskDir(${t.id})">定位文件夹</button>
+            <button class="btn btn-carbon" style="height:32px;padding:0 12px;font-size:12px;" onclick="bridge.openTaskFile(${t.id})">打开成稿</button>
+            <button class="btn btn-outline" style="height:32px;padding:0 12px;font-size:12px;" onclick="bridge.openTaskDir(${t.id})">定位目录</button>
           ` : ''}
-          ${t.status === 'failed' ? `<button class="btn btn-soft" style="padding:6px 12px;font-size:12px;" onclick="bridge.runTask(${t.id})">重试</button>` : ''}
-          <button class="btn btn-danger-ghost" onclick="bridge.deleteTask(${t.id})">移除记录</button>
+          ${t.status === 'failed' ? `<button class="btn btn-outline" style="height:32px;padding:0 12px;font-size:12px;" onclick="bridge.runTask(${t.id})">重试</button>` : ''}
+          <button class="btn btn-danger-text" onclick="bridge.deleteTask(${t.id})">移除</button>
         </div>
       </div>
     `).join('');
@@ -1308,23 +1462,22 @@ function renderTasksUI() {
 
   const dBox = qs('drawerTasks');
   dBox.innerHTML = tasksCache.slice(0, 6).map(t => `
-    <div style="padding:9px 11px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">
+    <div style="padding:10px 12px;border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--sheet-soft);">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
-        <span style="font-weight:600;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)}</span>
-        <span class="badge ${t.status}">${statusLabels[t.status] || t.status}</span>
+        <span style="font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)}</span>
+        <span class="status-tag ${t.status}">${statusLabels[t.status] || t.status}</span>
       </div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:3px;">${escapeHtml(t.create_time)}${t.file_size ? ' · ' + t.file_size : ''}</div>
+      <div class="mono" style="font-size:10.5px;color:var(--ink-3);margin-top:4px;">${escapeHtml(t.create_time)}${t.file_size ? ' · ' + t.file_size : ''}</div>
     </div>
-  `).join('') || '<div style="font-size:12px;color:var(--text-3);">暂无最近任务</div>';
+  `).join('') || '<div style="font-size:12px;color:var(--ink-3);">暂无最近任务</div>';
 }
 
 function renderLogsUI() {
   const html = logsCache.map(l => {
     const ts = (l.create_time || '').slice(11, 19);
-    return `<div class="log-line ${escapeHtml(l.level)}"><span class="log-ts">[${escapeHtml(ts)}]</span><span class="log-id">#${l.task_id}</span><span class="log-msg">${escapeHtml(l.message)}</span></div>`;
-  }).join('') || '<div style="color:var(--text-3);">暂无运行日志</div>';
+    return `<div class="log-line ${escapeHtml(l.level)}"><span class="log-ts">${escapeHtml(ts)}</span><span class="log-id">#${l.task_id}</span><span class="log-msg">${escapeHtml(l.message)}</span></div>`;
+  }).join('') || '<div style="color:var(--ink-3);">暂无审校日志</div>';
 
-  // Smart scroll preservation: NEVER jump to top/bottom when user is scrolling history!
   ['fullLogBox', 'drawerLogBox'].forEach(boxId => {
     const el = qs(boxId);
     if (!el) return;
@@ -1338,7 +1491,7 @@ function renderLogsUI() {
 
 function copyLogs() {
   const text = logsCache.map(l => `[${(l.create_time || '').slice(11, 19)}] #${l.task_id} [${l.level}] ${l.message}`).join('\n');
-  navigator.clipboard.writeText(text).then(() => showToast('已复制全部日志'));
+  navigator.clipboard.writeText(text).then(() => showToast('已复制审校日志'));
 }
 
 function clearLogs() {
@@ -1346,7 +1499,7 @@ function clearLogs() {
   showToast('已清空日志');
 }
 
-/* ── Keyboard & QtWebChannel Init ──────── */
+/* ── Keyboard & Bridge Init ────────────── */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeKernelModal(); toggleDrawer(false); }
   if (e.key === 'Enter' && currentView === 'workspace' && currentStep === 0 && !qs('loginBtn').disabled) {
@@ -1381,18 +1534,18 @@ function initBridge() {
         qs('captchaPlaceholder').style.display = 'none';
         if (ocrCode) {
           qs('captchaInput').value = ocrCode;
-          qs('ocrStatusTag').textContent = `已自动识别 (${ocrCode})`;
-          qs('ocrStatusTag').className = 'ocr-tag';
+          qs('ocrStatusTag').textContent = `OCR · ${ocrCode}`;
+          qs('ocrStatusTag').className = 'ocr-note';
         } else {
           qs('captchaInput').value = '';
           qs('ocrStatusTag').textContent = res.ocrAvailable ? '请手动输入' : '需手动输入';
-          qs('ocrStatusTag').className = 'ocr-tag wait';
+          qs('ocrStatusTag').className = 'ocr-note wait';
         }
       } else {
         qs('captchaPlaceholder').style.display = 'inline';
         qs('captchaPlaceholder').textContent = '获取失败';
-        qs('ocrStatusTag').textContent = res.error ? '点击重试' : '点击图片重试';
-        qs('ocrStatusTag').className = 'ocr-tag wait';
+        qs('ocrStatusTag').textContent = '点击图片重试';
+        qs('ocrStatusTag').className = 'ocr-note wait';
       }
     });
 
@@ -1400,7 +1553,7 @@ function initBridge() {
       const res = JSON.parse(raw);
       const btn = qs('loginBtn');
       btn.disabled = false;
-      btn.textContent = '登录并获取课程练习';
+      btn.textContent = '连接并载入题库';
       if (!res.ok) {
         qs('loginErr').textContent = res.error || '登录失败';
         qs('loginErr').classList.add('show');
@@ -1416,7 +1569,7 @@ function initBridge() {
       qs('switchAccBtn').style.display = 'inline-flex';
       renderPracticeGrid();
       goStep(1);
-      showToast(`连接成功，共载入 ${practices.length} 项练习`);
+      showToast(`已载入 ${practices.length} 项练习`);
     });
 
     bridge.filtersReady.connect(raw => {

@@ -42,6 +42,7 @@ data class MainUiState(
     val loginBusy: Boolean = false,
     val loginError: String? = null,
     val practices: List<PracticeItem> = emptyList(),
+    val practiceSearch: String = "",
     val selectedPracticeIds: Set<Int> = emptySet(),
     val chapters: List<ChapterItem> = emptyList(),
     val questionTypes: List<QuestionTypeItem> = emptyList(),
@@ -95,6 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 password = "",
                 captchaCode = "",
                 practices = emptyList(),
+                practiceSearch = "",
                 selectedPracticeIds = emptySet(),
                 chapters = emptyList(),
                 questionTypes = emptyList(),
@@ -115,6 +117,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateUsername(v: String) = _state.update { it.copy(username = v) }
     fun updatePassword(v: String) = _state.update { it.copy(password = v) }
     fun updateCaptchaCode(v: String) = _state.update { it.copy(captchaCode = v) }
+    fun updatePracticeSearch(q: String) = _state.update { it.copy(practiceSearch = q) }
     fun setAnswerVariant(v: AnswerVariant) = _state.update { it.copy(answerVariant = v) }
     fun setExportFormat(f: ExportFormat) = _state.update { it.copy(exportFormat = f) }
     fun setPracticedOnly(only: Boolean) = _state.update { it.copy(practicedOnly = only) }

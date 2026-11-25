@@ -14,6 +14,8 @@ from .models import Question
 _BASE64_RE = re.compile(r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
 _CHOICE_RE = re.compile(r"选择|单选|多选")
 _ZERO_WIDTH_RE = re.compile(r"[\s\u200b\u200c\u200d\ufeff]+")
+_BLANK_ENTITY_NAMES = frozenset({"nbsp", "ensp", "emsp", "thinsp", "zwnj", "zwj"})
+_BLANK_CODEPOINTS = frozenset({0x00A0, 0x2002, 0x2003, 0x2009, 0x200B, 0x200C, 0x200D, 0xFEFF})
 _IMG_SRC_DATA_RE = re.compile(r"^data:image/(?:png|jpeg|gif|webp|svg\+xml)(?:;[^,]*)?,", re.I)
 _IMG_SRC_HTTPS_RE = re.compile(
     r"^https?://(?:[a-z0-9-]+\.)*(?:cctrcloud\.net|aliyuncs\.com)(?::(?:80|443))?/",
@@ -21,11 +23,27 @@ _IMG_SRC_HTTPS_RE = re.compile(
 )
 
 _ALLOWED_TAGS = frozenset({
-    "p", "div", "span", "a", "br", "strong", "b", "em", "i", "u", "s",
-    "sup", "sub", "ol", "ul", "li", "table", "thead", "tbody", "tfoot",
-    "tr", "td", "th", "img", "blockquote", "pre",
+    "p", "div", "span", "a", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    "strong", "b", "em", "i", "u", "s", "sup", "sub", "code", "kbd", "samp",
+    "var", "mark", "del", "ins", "small", "big", "q", "cite", "dfn", "abbr",
+    "ol", "ul", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot",
+    "tr", "td", "th", "caption", "colgroup", "col", "img", "blockquote",
+    "pre", "section",
 })
-_VOID_TAGS = frozenset({"br", "img"})
+_VOID_TAGS = frozenset({"br", "img", "hr", "col"})
+_FORBIDDEN_TAGS = frozenset({
+    "script", "iframe", "frame", "frameset", "object", "embed", "applet",
+    "form", "input", "button", "select", "textarea", "link", "meta", "base",
+    "svg", "math",
+})
+_ALIAS_TAGS = {"strike": "s", "tt": "code"}
+_UNWRAP_TAGS = frozenset({"font", "center", "wbr"})
+_NS_TAG_RE = re.compile(r"^[a-z0-9]+:[a-z0-9_.-]+$")
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_MSO_COND_RE = re.compile(r"<!\[(?:if\b[^\]]*|endif)\]>?", re.I)
+_XML_PI_RE = re.compile(r"<\?xml\b[^>]*\?>", re.I)
+_XML_BLOCK_RE = re.compile(r"<xml\b[^>]*>.*?</xml>", re.I | re.S)
+_STYLE_BLOCK_RE = re.compile(r"<style\b[^>]*>.*?</style>", re.I | re.S)
 _ALLOWED_STYLE_RULES = {
     "font-weight": re.compile(r"^(?:normal|bold|[1-9]00)$"),
     "font-style": re.compile(r"^(?:normal|italic)$"),
@@ -44,10 +62,23 @@ VERIFY_AND_SLICE_JS = r"""
   }
   const images = Array.from(document.images || []);
   for (const image of images) {
-    try {
-      await image.decode();
-    } catch (e) {
-      return { ok: false, error: '图片或公式加载失败：' + (image.getAttribute('src') || '').slice(0, 80) };
+    let decoded = false;
+    const origSrc = image.getAttribute('src') || '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0 && /^https?:/i.test(origSrc)) {
+          await new Promise(r => setTimeout(r, 250));
+          image.removeAttribute('src');
+          image.setAttribute('src', origSrc);
+        }
+        await image.decode();
+        decoded = true;
+        break;
+      } catch (e) {
+      }
+    }
+    if (!decoded) {
+      return { ok: false, error: '图片或公式加载失败：' + origSrc.slice(0, 80) };
     }
     if (!image.naturalWidth || !image.naturalHeight) {
       return { ok: false, error: '图片或公式内容为空' };
@@ -205,6 +236,16 @@ def _sanitize_style(raw_style: str) -> str:
     return ";".join(kept)
 
 
+def _preclean_office_html(raw_html: str) -> str:
+    """剥离 MS Word/WPS 粘贴残留的条件注释、XML 元数据与内联样式块，保留正文内容。"""
+    cleaned = _COMMENT_RE.sub("", raw_html)
+    cleaned = _MSO_COND_RE.sub("", cleaned)
+    cleaned = _XML_PI_RE.sub("", cleaned)
+    cleaned = _XML_BLOCK_RE.sub("", cleaned)
+    cleaned = _STYLE_BLOCK_RE.sub("", cleaned)
+    return cleaned
+
+
 class _StrictHtmlSanitizer(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=False)
@@ -212,9 +253,14 @@ class _StrictHtmlSanitizer(HTMLParser):
         self.has_visible_content = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
-        t = tag.lower()
+        raw_t = tag.lower()
+        if raw_t in _FORBIDDEN_TAGS:
+            raise ValueError(f"暂不支持富文本标签：<{raw_t}>")
+        if raw_t in _UNWRAP_TAGS or _NS_TAG_RE.match(raw_t):
+            return
+        t = _ALIAS_TAGS.get(raw_t, raw_t)
         if t not in _ALLOWED_TAGS:
-            raise ValueError(f"暂不支持富文本标签：<{t}>")
+            raise ValueError(f"暂不支持富文本标签：<{raw_t}>")
         attr_map = {k.lower(): (v or "") for k, v in attrs}
         clean_attrs: list[str] = []
         if "style" in attr_map and attr_map["style"].strip():
@@ -244,9 +290,14 @@ class _StrictHtmlSanitizer(HTMLParser):
             self.out.append(f"<{t}{attr_str}>")
 
     def handle_endtag(self, tag: str):
-        t = tag.lower()
+        raw_t = tag.lower()
+        if raw_t in _FORBIDDEN_TAGS:
+            raise ValueError(f"暂不支持富文本标签：</{raw_t}>")
+        if raw_t in _UNWRAP_TAGS or _NS_TAG_RE.match(raw_t):
+            return
+        t = _ALIAS_TAGS.get(raw_t, raw_t)
         if t not in _ALLOWED_TAGS:
-            raise ValueError(f"暂不支持富文本标签：</{t}>")
+            raise ValueError(f"暂不支持富文本标签：</{raw_t}>")
         if t not in _VOID_TAGS:
             self.out.append(f"</{t}>")
 
@@ -256,11 +307,17 @@ class _StrictHtmlSanitizer(HTMLParser):
         self.out.append(html_lib.escape(data, quote=False))
 
     def handle_entityref(self, name: str):
-        self.has_visible_content = True
+        if name.lower() not in _BLANK_ENTITY_NAMES:
+            self.has_visible_content = True
         self.out.append(f"&{name};")
 
     def handle_charref(self, name: str):
-        self.has_visible_content = True
+        try:
+            cp = int(name[1:], 16) if name.lower().startswith("x") else int(name, 10)
+        except ValueError:
+            cp = -1
+        if cp not in _BLANK_CODEPOINTS and not (cp >= 0 and chr(cp).isspace()):
+            self.has_visible_content = True
         self.out.append(f"&#{name};")
 
 
@@ -268,8 +325,9 @@ def sanitize_rich_html(raw_html: str) -> str:
     """校验并净化受限富文本 HTML；空内容或不支持的标签/图片来源会直接抛错。"""
     if not isinstance(raw_html, str) or not raw_html.strip():
         raise ValueError("富文本内容为空")
+    cleaned = _preclean_office_html(raw_html)
     parser = _StrictHtmlSanitizer()
-    parser.feed(raw_html)
+    parser.feed(cleaned)
     parser.close()
     if not parser.has_visible_content:
         raise ValueError("富文本没有可见内容，无法确认题目或答案完整")
@@ -281,18 +339,19 @@ def has_visible_rich_content(raw_html: str) -> bool:
     stripped = (raw_html or "").strip()
     if not stripped:
         return False
-    if "<" in stripped and ">" in stripped:
+    cleaned = _preclean_office_html(stripped)
+    if "<" in cleaned and ">" in cleaned:
         try:
-            sanitize_rich_html(stripped)
+            sanitize_rich_html(cleaned)
             return True
         except ValueError:
             # 仅针对“无可见内容”视为空占位，不支持的标签/坏图仍需在上层暴露
-            text_only = re.sub(r"<[^>]+>", "", stripped).replace("&nbsp;", " ").replace("&#xa0;", " ")
-            has_img = bool(re.search(r"<img\b", stripped, re.I))
+            text_only = re.sub(r"<[^>]+>", "", cleaned).replace("&nbsp;", " ").replace("&#xa0;", " ")
+            has_img = bool(re.search(r"<img\b", cleaned, re.I))
             if not has_img and not _ZERO_WIDTH_RE.sub("", text_only):
                 return False
             raise
-    return bool(_ZERO_WIDTH_RE.sub("", stripped))
+    return bool(_ZERO_WIDTH_RE.sub("", cleaned))
 
 
 def _render_text_or_html(val: str) -> tuple[str, bool]:

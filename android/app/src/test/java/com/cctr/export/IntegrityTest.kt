@@ -102,4 +102,33 @@ class IntegrityTest {
         assertTrue(Integrity.buildExportDocumentHtml(listOf(q), smartPagination = true).contains("data-smart-pagination=\"1\""))
         assertTrue(Integrity.buildExportDocumentHtml(listOf(q), smartPagination = false).contains("data-smart-pagination=\"0\""))
     }
+
+    @Test
+    fun wordSmartTagsFontAndMsoCommentsAreSanitizedCleanly() {
+        val rawWord = "<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]-->" +
+            "<p>载频 <st1:chmetcnv UnitName=\"Hz\">3000Hz</st1:chmetcnv>，" +
+            "信息码 <st1:chsdate year=\"2001\">1-1-1</st1:chsdate>，" +
+            "<font size=\"4\" face=\"宋体\">基带系统</font><o:p></o:p></p>"
+        val clean = Integrity.sanitizeRichHtml(rawWord)
+        assertTrue(clean.contains("3000Hz"))
+        assertTrue(clean.contains("1-1-1"))
+        assertTrue(clean.contains("基带系统"))
+        assertFalse(clean.contains("Normal"))
+        assertFalse(clean.contains("st1:"))
+        assertFalse(clean.contains("<font"))
+
+        assertFalse(
+            Integrity.hasVisibleRichContent(
+                "<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]--><p> &nbsp; </p>"
+            )
+        )
+
+        var threwObj = false
+        try {
+            Integrity.sanitizeRichHtml("<object data=\"x\"></object><p>x</p>")
+        } catch (_: IllegalArgumentException) {
+            threwObj = true
+        }
+        assertTrue(threwObj)
+    }
 }

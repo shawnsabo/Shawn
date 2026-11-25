@@ -289,3 +289,70 @@ def test_smart_pagination_keeps_short_questions_intact_and_breaks_after_long(tmp
     pdf_off = export_questions_to_pdf(qs, tmp_path, kernel="auto", filename="compact.pdf", smart_pagination=False)
     reader_off = pypdf.PdfReader(str(pdf_off))
     assert len(reader_off.pages) <= len(reader.pages)
+
+
+def test_word_smarttags_font_mso_comments_and_image_inlining(monkeypatch):
+    from cctr_export.core import exporter as exp_mod
+    from cctr_export.core.integrity import has_visible_rich_content
+
+    raw_word = (
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]-->'
+        '<p>载频 <st1:chmetcnv UnitName="Hz" SourceValue="3000">3000Hz</st1:chmetcnv>，'
+        '信息码 <st1:chsdate year="2001" month="1" day="1">1-1-1</st1:chsdate>，'
+        '<font size="4" face="宋体">基带系统</font><o:p></o:p></p>'
+    )
+    cleaned = sanitize_rich_html(raw_word)
+    assert "3000Hz" in cleaned
+    assert "1-1-1" in cleaned
+    assert "基带系统" in cleaned
+    assert "Normal" not in cleaned
+    assert "<st1:" not in cleaned
+    assert "<font" not in cleaned
+
+    # Pure Word comment metadata with no visible body must not leak text or raise error in optional analysis
+    assert not has_visible_rich_content(
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]--><p> &nbsp; </p>'
+    )
+
+    # Dangerous tags must still be rejected
+    with pytest.raises(ValueError):
+        sanitize_rich_html("<script>alert(1)</script><p>x</p>")
+    with pytest.raises(ValueError):
+        sanitize_rich_html("<object data=\"x\"></object><p>x</p>")
+
+    # Verify remote OSS HTTP/HTTPS images get prefetched and inlined into data URIs
+    buf = io.BytesIO()
+    Image.new("RGB", (24, 24), color=(10, 20, 30)).save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    class _FakeResp:
+        status_code = 200
+        content = png_bytes
+
+    class _FakeSess:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get(self, url, *args, **kwargs):
+            return _FakeResp()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(exp_mod, "ResilientHttpSession", _FakeSess)
+    q_img = Question(
+        id="9:1",
+        question_type="简答题",
+        subject_html='<p><img src="http://ce-images.oss-cn-beijing.aliyuncs.com/school_U101441/a.png" /></p>',
+        answer="ok",
+        has_options=False,
+        options=[Option(is_true=True, html='<img src="https://ce-images.oss-cn-beijing.aliyuncs.com/school_U101441/b.png" />')],
+        subject_name="通信",
+        chapter_name="第六章",
+        analysis_html=raw_word,
+        is_choice=False,
+    )
+    inlined = exp_mod.prefetch_and_inline_images([q_img])
+    assert inlined[0].subject_html.startswith('<p><img src="data:image/png;base64,')
+    assert inlined[0].options[0].html.startswith('<img src="data:image/png;base64,')
+

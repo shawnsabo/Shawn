@@ -13,21 +13,43 @@ object Integrity {
     private val BASE64_RE = Regex("^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
     private val CHOICE_RE = Regex("选择|单选|多选")
     private val ZERO_WIDTH_RE = Regex("[\\s\\u200b\\u200c\\u200d\\ufeff]+")
+    private val BLANK_ENTITY_RE = Regex("&(?:nbsp|ensp|emsp|thinsp|zwnj|zwj|#160|#xa0|#8194|#8195|#8201|#8203|#x200b|#65279|#xfeff);", RegexOption.IGNORE_CASE)
+
+    private fun hasNonBlankText(raw: String): Boolean {
+        val strippedEntities = BLANK_ENTITY_RE.replace(raw, "")
+        return ZERO_WIDTH_RE.replace(strippedEntities, "").isNotEmpty()
+    }
     private val IMG_DATA_RE = Regex("^data:image/(?:png|jpeg|gif|webp|svg\\+xml)(?:;[^,]*)?,", RegexOption.IGNORE_CASE)
     private val IMG_HTTPS_RE = Regex(
         "^https?://(?:[a-z0-9-]+\\.)*(?:cctrcloud\\.net|aliyuncs\\.com)(?::(?:80|443))?/",
         RegexOption.IGNORE_CASE
     )
-    private val TAG_RE = Regex("<(/?)([a-zA-Z0-9]+)([^>]*)>", RegexOption.DOT_MATCHES_ALL)
+    private val TAG_RE = Regex("<(/?)([a-zA-Z][a-zA-Z0-9_.:-]*)([^>]*)>", RegexOption.DOT_MATCHES_ALL)
     private val ATTR_RE = Regex("([a-zA-Z_:][-a-zA-Z0-9_.:]*)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))")
     private val ENTITY_RE = Regex("&(?:#\\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]{1,15});")
+    private val COMMENT_RE = Regex("<!--.*?-->", RegexOption.DOT_MATCHES_ALL)
+    private val MSO_COND_RE = Regex("<!\\[(?:if\\b[^\\]]*|endif)\\]>?", RegexOption.IGNORE_CASE)
+    private val XML_PI_RE = Regex("<\\?xml\\b[^>]*\\?>", RegexOption.IGNORE_CASE)
+    private val XML_BLOCK_RE = Regex("<xml\\b[^>]*>.*?</xml>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val STYLE_BLOCK_RE = Regex("<style\\b[^>]*>.*?</style>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+    private val NS_TAG_RE = Regex("^[a-z0-9]+:[a-z0-9_.-]+$")
 
     private val ALLOWED_TAGS = setOf(
-        "p", "div", "span", "a", "br", "strong", "b", "em", "i", "u", "s",
-        "sup", "sub", "ol", "ul", "li", "table", "thead", "tbody", "tfoot",
-        "tr", "td", "th", "img", "blockquote", "pre"
+        "p", "div", "span", "a", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+        "strong", "b", "em", "i", "u", "s", "sup", "sub", "code", "kbd", "samp",
+        "var", "mark", "del", "ins", "small", "big", "q", "cite", "dfn", "abbr",
+        "ol", "ul", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot",
+        "tr", "td", "th", "caption", "colgroup", "col", "img", "blockquote",
+        "pre", "section"
     )
-    private val VOID_TAGS = setOf("br", "img")
+    private val VOID_TAGS = setOf("br", "img", "hr", "col")
+    private val FORBIDDEN_TAGS = setOf(
+        "script", "iframe", "frame", "frameset", "object", "embed", "applet",
+        "form", "input", "button", "select", "textarea", "link", "meta", "base",
+        "svg", "math"
+    )
+    private val ALIAS_TAGS = mapOf("strike" to "s", "tt" to "code")
+    private val UNWRAP_TAGS = setOf("font", "center", "wbr")
     private const val MAX_GZIP_BYTES = 16 * 1024 * 1024
 
     const val VERIFY_AND_SLICE_JS = """
@@ -37,10 +59,23 @@ object Integrity {
           }
           const images = Array.from(document.images || []);
           for (const image of images) {
-            try {
-              await image.decode();
-            } catch (e) {
-              return JSON.stringify({ ok: false, error: '图片或公式加载失败：' + (image.getAttribute('src') || '').slice(0, 80) });
+            let decoded = false;
+            const origSrc = image.getAttribute('src') || '';
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                if (attempt > 0 && /^https?:/i.test(origSrc)) {
+                  await new Promise(r => setTimeout(r, 250));
+                  image.removeAttribute('src');
+                  image.setAttribute('src', origSrc);
+                }
+                await image.decode();
+                decoded = true;
+                break;
+              } catch (e) {
+              }
+            }
+            if (!decoded) {
+              return JSON.stringify({ ok: false, error: '图片或公式加载失败：' + origSrc.slice(0, 80) });
             }
             if (!image.naturalWidth || !image.naturalHeight) {
               return JSON.stringify({ ok: false, error: '图片或公式内容为空' });
@@ -190,67 +225,86 @@ object Integrity {
         }
     }
 
+    private fun precleanOfficeHtml(rawHtml: String): String {
+        var cleaned = COMMENT_RE.replace(rawHtml, "")
+        cleaned = MSO_COND_RE.replace(cleaned, "")
+        cleaned = XML_PI_RE.replace(cleaned, "")
+        cleaned = XML_BLOCK_RE.replace(cleaned, "")
+        cleaned = STYLE_BLOCK_RE.replace(cleaned, "")
+        return cleaned
+    }
+
     fun sanitizeRichHtml(rawHtml: String): String {
         val trimmed = rawHtml.trim()
         require(trimmed.isNotEmpty()) { "富文本内容为空" }
+        val cleaned = precleanOfficeHtml(trimmed)
 
         var hasVisibleContent = false
         val sb = StringBuilder()
         var lastIdx = 0
 
-        for (match in TAG_RE.findAll(trimmed)) {
+        for (match in TAG_RE.findAll(cleaned)) {
             if (match.range.first > lastIdx) {
-                val textPart = trimmed.substring(lastIdx, match.range.first)
-                if (ZERO_WIDTH_RE.replace(textPart, "").isNotEmpty()) {
+                val textPart = cleaned.substring(lastIdx, match.range.first)
+                if (hasNonBlankText(textPart)) {
                     hasVisibleContent = true
                 }
                 sb.append(escapeHtmlPreservingEntities(textPart))
             }
             val isClosing = match.groupValues[1] == "/"
-            val tag = match.groupValues[2].lowercase()
+            val rawTag = match.groupValues[2].lowercase()
             val rawAttrs = match.groupValues[3]
-            require(tag in ALLOWED_TAGS) { "暂不支持富文本标签：<$tag>" }
+            require(rawTag !in FORBIDDEN_TAGS) {
+                "暂不支持富文本标签：<${if (isClosing) "/" else ""}$rawTag>"
+            }
 
-            if (isClosing) {
-                if (tag !in VOID_TAGS) sb.append("</$tag>")
-            } else {
-                val cleanAttrs = mutableListOf<String>()
-                var srcFound: String? = null
-                for (am in ATTR_RE.findAll(rawAttrs)) {
-                    val k = am.groupValues[1].lowercase()
-                    val v = am.groupValues[2].ifEmpty { am.groupValues[3].ifEmpty { am.groupValues[4] } }
-                    when {
-                        tag == "img" && k == "src" -> {
-                            var s = v.trim()
-                            require(IMG_DATA_RE.containsMatchIn(s) || IMG_HTTPS_RE.containsMatchIn(s)) {
-                                "图片来源不在允许域（仅支持内嵌图片或 cctrcloud.net / aliyuncs.com）"
+            if (rawTag !in UNWRAP_TAGS && !NS_TAG_RE.matches(rawTag)) {
+                val tag = ALIAS_TAGS[rawTag] ?: rawTag
+                require(tag in ALLOWED_TAGS) {
+                    "暂不支持富文本标签：<${if (isClosing) "/" else ""}$rawTag>"
+                }
+
+                if (isClosing) {
+                    if (tag !in VOID_TAGS) sb.append("</$tag>")
+                } else {
+                    val cleanAttrs = mutableListOf<String>()
+                    var srcFound: String? = null
+                    for (am in ATTR_RE.findAll(rawAttrs)) {
+                        val k = am.groupValues[1].lowercase()
+                        val v = am.groupValues[2].ifEmpty { am.groupValues[3].ifEmpty { am.groupValues[4] } }
+                        when {
+                            tag == "img" && k == "src" -> {
+                                var s = v.trim()
+                                require(IMG_DATA_RE.containsMatchIn(s) || IMG_HTTPS_RE.containsMatchIn(s)) {
+                                    "图片来源不在允许域（仅支持内嵌图片或 cctrcloud.net / aliyuncs.com）"
+                                }
+                                if (s.startsWith("http://", ignoreCase = true)) {
+                                    s = "https://" + s.substring(7)
+                                }
+                                srcFound = s
+                                hasVisibleContent = true
+                                cleanAttrs += "src=\"${escapeAttr(s)}\""
                             }
-                            if (s.startsWith("http://", ignoreCase = true)) {
-                                s = "https://" + s.substring(7)
+                            tag == "img" && k in setOf("alt", "width", "height", "align") && v.isNotBlank() -> {
+                                cleanAttrs += "$k=\"${escapeAttr(v)}\""
                             }
-                            srcFound = s
-                            hasVisibleContent = true
-                            cleanAttrs += "src=\"${escapeAttr(s)}\""
-                        }
-                        tag == "img" && k in setOf("alt", "width", "height", "align") && v.isNotBlank() -> {
-                            cleanAttrs += "$k=\"${escapeAttr(v)}\""
-                        }
-                        (tag == "td" || tag == "th") && k in setOf("colspan", "rowspan") && v.all { it.isDigit() } -> {
-                            cleanAttrs += "$k=\"$v\""
+                            (tag == "td" || tag == "th") && k in setOf("colspan", "rowspan") && v.all { it.isDigit() } -> {
+                                cleanAttrs += "$k=\"$v\""
+                            }
                         }
                     }
+                    if (tag == "img") {
+                        require(!srcFound.isNullOrBlank()) { "图片标签缺少 src" }
+                    }
+                    val attrStr = if (cleanAttrs.isEmpty()) "" else " " + cleanAttrs.joinToString(" ")
+                    if (tag in VOID_TAGS) sb.append("<$tag$attrStr />") else sb.append("<$tag$attrStr>")
                 }
-                if (tag == "img") {
-                    require(!srcFound.isNullOrBlank()) { "图片标签缺少 src" }
-                }
-                val attrStr = if (cleanAttrs.isEmpty()) "" else " " + cleanAttrs.joinToString(" ")
-                if (tag in VOID_TAGS) sb.append("<$tag$attrStr />") else sb.append("<$tag$attrStr>")
             }
             lastIdx = match.range.last + 1
         }
-        if (lastIdx < trimmed.length) {
-            val tail = trimmed.substring(lastIdx)
-            if (ZERO_WIDTH_RE.replace(tail, "").isNotEmpty()) {
+        if (lastIdx < cleaned.length) {
+            val tail = cleaned.substring(lastIdx)
+            if (hasNonBlankText(tail)) {
                 hasVisibleContent = true
             }
             sb.append(escapeHtmlPreservingEntities(tail))
@@ -262,23 +316,22 @@ object Integrity {
     fun hasVisibleRichContent(rawHtml: String): Boolean {
         val trimmed = rawHtml.trim()
         if (trimmed.isEmpty()) return false
-        return if ('<' in trimmed && '>' in trimmed) {
+        val cleaned = precleanOfficeHtml(trimmed)
+        return if ('<' in cleaned && '>' in cleaned) {
             try {
-                sanitizeRichHtml(trimmed)
+                sanitizeRichHtml(cleaned)
                 true
             } catch (e: IllegalArgumentException) {
-                val textOnly = trimmed.replace(Regex("<[^>]+>"), "")
-                    .replace("&nbsp;", " ")
-                    .replace("&#xa0;", " ")
-                val hasImg = Regex("<img\\b", RegexOption.IGNORE_CASE).containsMatchIn(trimmed)
-                if (!hasImg && ZERO_WIDTH_RE.replace(textOnly, "").isEmpty()) {
+                val textOnly = cleaned.replace(Regex("<[^>]+>"), "")
+                val hasImg = Regex("<img\\b", RegexOption.IGNORE_CASE).containsMatchIn(cleaned)
+                if (!hasImg && !hasNonBlankText(textOnly)) {
                     false
                 } else {
                     throw e
                 }
             }
         } else {
-            ZERO_WIDTH_RE.replace(trimmed, "").isNotEmpty()
+            hasNonBlankText(cleaned)
         }
     }
 
