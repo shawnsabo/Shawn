@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import json
 import os
 import subprocess
@@ -9,7 +10,8 @@ import sys
 import threading
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QIODevice, QObject, QSize, QThread, QTimer, QUrl, Qt, Signal, Slot
+from PySide6.QtCore import QEvent, QFile, QIODevice, QObject, QSize, QThread, QTimer, QUrl, Qt, Signal, Slot
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineScript, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -42,6 +44,33 @@ from ..core.kernels import (
 )
 from ..core.models import ChapterType, Practice, QuestionType
 from ..core.tasks import engine
+
+
+def _build_atelier_icon() -> QIcon:
+    """绘制 Editorial Atelier 裁切十字标应用图标。"""
+    pix = QPixmap(64, 64)
+    pix.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pix)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    painter.setBrush(QColor("#141413"))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.drawRoundedRect(4, 4, 56, 56, 12, 12)
+    pen = QPen(QColor("#FAF9F6"), 3.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.SquareCap)
+    painter.setPen(pen)
+    # 四角裁切线
+    painter.drawLine(14, 14, 23, 14)
+    painter.drawLine(14, 14, 14, 23)
+    painter.drawLine(50, 14, 41, 14)
+    painter.drawLine(50, 14, 50, 23)
+    painter.drawLine(14, 50, 23, 50)
+    painter.drawLine(14, 50, 14, 41)
+    painter.drawLine(50, 50, 41, 50)
+    painter.drawLine(50, 50, 50, 41)
+    # 中心十字准星
+    painter.drawLine(32, 22, 32, 42)
+    painter.drawLine(22, 32, 42, 32)
+    painter.end()
+    return QIcon(pix)
 
 
 def _resolve_web_index() -> Path:
@@ -244,6 +273,7 @@ class DesktopBridge(QObject):
     stateChanged = Signal(str)
     kernelProgress = Signal(int, str)
     kernelDone = Signal(str)
+    windowStateChanged = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -512,11 +542,71 @@ class DesktopBridge(QObject):
     def setDarkMode(self, dark: bool):
         save_settings({"dark_mode": bool(dark)})
 
+    def _main_win(self) -> QMainWindow | None:
+        p = self.parent()
+        return p if isinstance(p, QMainWindow) else None
+
+    @Slot()
+    def windowMinimize(self):
+        w = self._main_win()
+        if w:
+            w.showMinimized()
+
+    @Slot()
+    def windowToggleMaximize(self):
+        w = self._main_win()
+        if not w:
+            return
+        if w.isMaximized():
+            w.showNormal()
+        else:
+            w.showMaximized()
+
+    @Slot()
+    def windowClose(self):
+        w = self._main_win()
+        if w:
+            w.close()
+
+    @Slot()
+    def windowStartDrag(self):
+        w = self._main_win()
+        if w and w.windowHandle():
+            w.windowHandle().startSystemMove()
+
+    @Slot(str)
+    def windowStartResize(self, edge: str):
+        w = self._main_win()
+        if not w or not w.windowHandle():
+            return
+        edge_map = {
+            "n": Qt.Edge.TopEdge,
+            "s": Qt.Edge.BottomEdge,
+            "w": Qt.Edge.LeftEdge,
+            "e": Qt.Edge.RightEdge,
+            "nw": Qt.Edge.TopEdge | Qt.Edge.LeftEdge,
+            "ne": Qt.Edge.TopEdge | Qt.Edge.RightEdge,
+            "sw": Qt.Edge.BottomEdge | Qt.Edge.LeftEdge,
+            "se": Qt.Edge.BottomEdge | Qt.Edge.RightEdge,
+        }
+        qt_edge = edge_map.get((edge or "").lower())
+        if qt_edge is not None:
+            w.windowHandle().startSystemResize(qt_edge)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("CCTR Atelier · 融智云考印务工作台")
+        self.setWindowIcon(_build_atelier_icon())
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.Window
+            | Qt.WindowType.WindowMinimizeButtonHint
+            | Qt.WindowType.WindowMaximizeButtonHint
+            | Qt.WindowType.WindowSystemMenuHint
+        )
+        self._dwm_applied = False
         self.setMinimumSize(QSize(680, 560))
         self.resize(1340, 840)
 
@@ -558,6 +648,38 @@ class MainWindow(QMainWindow):
         self._timer = QTimer(self)
         self._timer.timeout.connect(lambda: self._bridge.poll_state(False))
         self._timer.start(1500)
+
+    def _apply_win11_dwm_style(self):
+        if self._dwm_applied or os.name != "nt":
+            return
+        self._dwm_applied = True
+        try:
+            class _MARGINS(ctypes.Structure):
+                _fields_ = [
+                    ("cxLeftWidth", ctypes.c_int),
+                    ("cxRightWidth", ctypes.c_int),
+                    ("cyTopHeight", ctypes.c_int),
+                    ("cyBottomHeight", ctypes.c_int),
+                ]
+
+            hwnd = int(self.winId())
+            dwm = ctypes.windll.dwmapi
+            dwm.DwmSetWindowAttribute(
+                hwnd, 33, ctypes.byref(ctypes.c_int(2)), ctypes.sizeof(ctypes.c_int)
+            )
+            margins = _MARGINS(0, 0, 0, 1)
+            dwm.DwmExtendFrameIntoClientArea(hwnd, ctypes.byref(margins))
+        except Exception:
+            pass
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._apply_win11_dwm_style()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.WindowStateChange and hasattr(self, "_bridge"):
+            self._bridge.windowStateChanged.emit(self.isMaximized())
 
     def closeEvent(self, event):
         self._bridge.stop_workers()

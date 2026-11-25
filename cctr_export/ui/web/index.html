@@ -72,7 +72,36 @@
   button:focus-visible, input:focus-visible, select:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 2px; }
   .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-  .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+  .app { display: flex; flex-direction: column; height: 100vh; width: 100vw; border: 1px solid var(--line); }
+  body.maximized .app { border-color: transparent; }
+
+  /* ── Frameless Edge Resize Zones ────────────────────────── */
+  .resize-edge { position: fixed; z-index: 200; }
+  body.maximized .resize-edge { display: none; }
+  .resize-n  { top: 0; left: 8px; right: 8px; height: 5px; cursor: ns-resize; }
+  .resize-s  { bottom: 0; left: 8px; right: 8px; height: 5px; cursor: ns-resize; }
+  .resize-w  { left: 0; top: 8px; bottom: 8px; width: 5px; cursor: ew-resize; }
+  .resize-e  { right: 0; top: 8px; bottom: 8px; width: 5px; cursor: ew-resize; }
+  .resize-nw { top: 0; left: 0; width: 9px; height: 9px; cursor: nwse-resize; }
+  .resize-ne { top: 0; right: 0; width: 9px; height: 9px; cursor: nesw-resize; }
+  .resize-sw { bottom: 0; left: 0; width: 9px; height: 9px; cursor: nesw-resize; }
+  .resize-se { bottom: 0; right: 0; width: 9px; height: 9px; cursor: nwse-resize; }
+
+  /* ── Integrated Frameless Window Controls ───────────────── */
+  .win-controls {
+    display: inline-flex; align-items: stretch; align-self: stretch;
+    margin-left: 4px; margin-right: -18px;
+    border-left: 1px solid var(--line);
+  }
+  .win-btn {
+    width: 44px; border: none; background: transparent;
+    color: var(--ink-2); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s;
+  }
+  .win-btn:hover { background: var(--well); color: var(--ink); }
+  .win-btn.win-close:hover { background: #c83e2b; color: #faf9f6; }
+  .win-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.5; }
 
   /* ── Top Precision Bar (48px) ───────────────────────────── */
   .topbar {
@@ -615,6 +644,8 @@
     .vtick, .strip-meta { display: none; }
     .brand { padding-right: 6px; }
     .nav-tab { padding: 4px 8px; font-size: 12.5px; }
+    .win-controls { margin-right: -12px; align-self: center; border-left: none; }
+    .win-btn { width: 32px; height: 30px; border-radius: 5px; }
     .index-strip { padding: 0 12px; height: 36px; min-height: 36px; }
     .step-tabs { gap: 14px; width: 100%; justify-content: space-between; }
     .scroll-body { padding: 16px 14px 24px; }
@@ -627,9 +658,18 @@
 </style>
 </head>
 <body>
+<div class="resize-edge resize-n" onmousedown="startResize(event,'n')"></div>
+<div class="resize-edge resize-s" onmousedown="startResize(event,'s')"></div>
+<div class="resize-edge resize-w" onmousedown="startResize(event,'w')"></div>
+<div class="resize-edge resize-e" onmousedown="startResize(event,'e')"></div>
+<div class="resize-edge resize-nw" onmousedown="startResize(event,'nw')"></div>
+<div class="resize-edge resize-ne" onmousedown="startResize(event,'ne')"></div>
+<div class="resize-edge resize-sw" onmousedown="startResize(event,'sw')"></div>
+<div class="resize-edge resize-se" onmousedown="startResize(event,'se')"></div>
+
 <div class="app">
-  <!-- Unified Precision Topbar -->
-  <header class="topbar">
+  <!-- Unified Precision Topbar (Frameless Integrated) -->
+  <header class="topbar" id="topbar">
     <div class="top-left">
       <div class="brand">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -679,6 +719,18 @@
       <button class="icon-btn" onclick="toggleTheme()" id="themeBtn" title="切换浅色/深色主题" aria-label="切换主题">
         <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
+
+      <div class="win-controls">
+        <button class="win-btn" onclick="bridge && bridge.windowMinimize()" title="最小化" aria-label="最小化">
+          <svg viewBox="0 0 16 16"><line x1="3" y1="8" x2="13" y2="8"/></svg>
+        </button>
+        <button class="win-btn" id="maxBtn" onclick="bridge && bridge.windowToggleMaximize()" title="最大化" aria-label="最大化">
+          <svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="0.8"/></svg>
+        </button>
+        <button class="win-btn win-close" onclick="bridge && bridge.windowClose()" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 16 16"><line x1="3.5" y1="3.5" x2="12.5" y2="12.5"/><line x1="12.5" y1="3.5" x2="3.5" y2="12.5"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -1499,6 +1551,34 @@ function clearLogs() {
   showToast('已清空日志');
 }
 
+/* ── Frameless Window Drag & Resize ─────── */
+function startResize(e, edge) {
+  if (e.button !== 0 || !bridge) return;
+  e.preventDefault();
+  bridge.windowStartResize(edge);
+}
+
+function updateMaxIcon(isMax) {
+  const btn = qs('maxBtn');
+  if (!btn) return;
+  btn.title = isMax ? '向下还原' : '最大化';
+  btn.innerHTML = isMax
+    ? '<svg viewBox="0 0 16 16"><rect x="3" y="5" width="8" height="8" rx="0.8"/><path d="M5.5 3h7.5v7.5"/></svg>'
+    : '<svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="0.8"/></svg>';
+}
+
+qs('topbar').addEventListener('mousedown', e => {
+  if (e.button !== 0 || !bridge) return;
+  if (e.target.closest('button, a, input, select, .tool-group, .win-controls, .nav-tab')) return;
+  bridge.windowStartDrag();
+});
+
+qs('topbar').addEventListener('dblclick', e => {
+  if (!bridge) return;
+  if (e.target.closest('button, a, input, select, .tool-group, .win-controls, .nav-tab')) return;
+  bridge.windowToggleMaximize();
+});
+
 /* ── Keyboard & Bridge Init ────────────── */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeKernelModal(); toggleDrawer(false); }
@@ -1604,6 +1684,13 @@ function initBridge() {
       qs('kernelProgMsg').textContent = res.ok ? res.message : (res.error || '安装失败');
       if (res.ok) showToast(res.message);
     });
+
+    if (bridge.windowStateChanged) {
+      bridge.windowStateChanged.connect(isMax => {
+        document.body.classList.toggle('maximized', !!isMax);
+        updateMaxIcon(!!isMax);
+      });
+    }
   });
 }
 initBridge();
