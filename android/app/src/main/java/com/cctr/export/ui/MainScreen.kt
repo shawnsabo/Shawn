@@ -2,7 +2,9 @@ package com.cctr.export.ui
 
 import android.content.Context
 import android.content.Intent
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -22,7 +24,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -76,15 +78,24 @@ import com.cctr.export.core.AnswerVariant
 import com.cctr.export.core.ExportFormat
 import com.cctr.export.core.PracticeItem
 import java.io.File
+import kotlin.math.roundToInt
+
+private val NAV_TABS = listOf(
+    Triple(0, "01", "工作台"),
+    Triple(1, "02", "审校日志"),
+    Triple(2, "03", "本地归档")
+)
+
+private val WIZARD_STEPS = listOf(
+    Triple(1, "01", "身份接入"),
+    Triple(2, "02", "课程遴选"),
+    Triple(3, "03", "版式付印")
+)
 
 @Composable
 fun MainScreen(vm: MainViewModel) {
     val state by vm.state.collectAsState()
-    val navTabs = listOf(
-        Triple(0, "01", "工作台"),
-        Triple(1, "02", "审校日志"),
-        Triple(2, "03", "本地归档")
-    )
+    val navTabs = NAV_TABS
 
     BoxWithConstraints(
         modifier = Modifier
@@ -294,8 +305,17 @@ private fun AtelierTabletRail(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("识别引擎", fontSize = 10.sp, color = CctrColors.InkMuted)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(modifier = Modifier.size(6.dp).background(CctrColors.StatusOk, CircleShape))
-                    Text("ONNX 离线就绪", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkPrimary)
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(if (state.ocrReady) CctrColors.StatusOk else CctrColors.InkMuted, CircleShape)
+                    )
+                    Text(
+                        text = if (state.ocrReady) "ONNX 离线就绪" else "ONNX 初始化…",
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = CctrColors.InkPrimary
+                    )
                 }
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -369,8 +389,17 @@ private fun AtelierPhoneTopBar(vm: MainViewModel, state: MainUiState) {
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Box(modifier = Modifier.size(5.dp).background(CctrColors.StatusOk, CircleShape))
-                        Text("ONNX 就绪", fontSize = 10.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkSecondary)
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .background(if (state.ocrReady) CctrColors.StatusOk else CctrColors.InkMuted, CircleShape)
+                        )
+                        Text(
+                            text = if (state.ocrReady) "ONNX 就绪" else "ONNX 加载中",
+                            fontSize = 10.5.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = CctrColors.InkSecondary
+                        )
                     }
                 }
             }
@@ -431,11 +460,7 @@ private fun AtelierPhoneBottomBar(
 
 @Composable
 private fun AtelierStepperStrip(vm: MainViewModel, state: MainUiState, showSpec: Boolean) {
-    val steps = listOf(
-        Triple(1, "01", "身份接入"),
-        Triple(2, "02", "课程遴选"),
-        Triple(3, "03", "版式付印")
-    )
+    val steps = WIZARD_STEPS
     Column(modifier = Modifier.fillMaxWidth().background(CctrColors.BgSheetSoft)) {
         Row(
             modifier = Modifier
@@ -694,7 +719,16 @@ private fun AtelierSwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    val thumbOffset by animateDpAsState(targetValue = if (checked) 14.dp else 0.dp, label = "switchThumb")
+    val thumbProgress by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = tween(160),
+        label = "switchThumb"
+    )
+    val trackColor by animateColorAsState(
+        targetValue = if (checked) CctrColors.InkPrimary else CctrColors.LineStrong,
+        animationSpec = tween(160),
+        label = "switchTrack"
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -712,12 +746,12 @@ private fun AtelierSwitchRow(
                 .width(34.dp)
                 .height(20.dp)
                 .clip(RoundedCornerShape(999.dp))
-                .background(if (checked) CctrColors.InkPrimary else CctrColors.LineStrong)
+                .background(trackColor)
                 .padding(2.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .offset(x = thumbOffset)
+                    .graphicsLayer { translationX = thumbProgress * 14.dp.toPx() }
                     .size(16.dp)
                     .background(CctrColors.BgSurface, CircleShape)
             )
@@ -729,6 +763,17 @@ private fun AtelierSwitchRow(
 
 @Composable
 private fun WorkspaceStage(vm: MainViewModel, state: MainUiState, isTablet: Boolean, isExpanded: Boolean) {
+    if (state.wizardStep == 2) {
+        Box(
+            contentAlignment = Alignment.TopCenter,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = if (isTablet) 24.dp else 14.dp, vertical = if (isTablet) 22.dp else 16.dp)
+        ) {
+            PracticePickerView(vm, state, isTablet = isTablet)
+        }
+        return
+    }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -738,7 +783,6 @@ private fun WorkspaceStage(vm: MainViewModel, state: MainUiState, isTablet: Bool
     ) {
         when (state.wizardStep) {
             1 -> AuthStepView(vm, state, isExpanded = isExpanded)
-            2 -> PracticePickerView(vm, state, isTablet = isTablet)
             else -> ExportBenchView(vm, state, isTablet = isTablet, isExpanded = isExpanded)
         }
     }
@@ -869,11 +913,11 @@ private fun QuickUtilityColumn(vm: MainViewModel, state: MainUiState) {
                     Text("暂无已导出成稿，完成后可在此免登录直接打开。", fontSize = 12.sp, color = CctrColors.InkMuted)
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.savedFiles.take(5).forEach { file ->
+                        state.savedFiles.take(5).forEach { item ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { openExportedFile(context, file) }
+                                    .clickable { openExportedFile(context, item.file) }
                                     .padding(vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -884,7 +928,7 @@ private fun QuickUtilityColumn(vm: MainViewModel, state: MainUiState) {
                                     border = BorderStroke(1.dp, CctrColors.BorderHairline)
                                 ) {
                                     Text(
-                                        file.extension.uppercase().ifBlank { "FILE" },
+                                        item.ext,
                                         fontSize = 10.sp,
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.SemiBold,
@@ -893,8 +937,8 @@ private fun QuickUtilityColumn(vm: MainViewModel, state: MainUiState) {
                                     )
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(file.name, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, color = CctrColors.InkPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("${file.length() / 1024} KB · 点击打开", fontSize = 10.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
+                                    Text(item.name, fontSize = 12.5.sp, fontWeight = FontWeight.Medium, color = CctrColors.InkPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("${item.sizeKb} KB · 点击打开", fontSize = 10.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
                                 }
                             }
                         }
@@ -984,6 +1028,7 @@ private fun AtelierAuthSheet(vm: MainViewModel, state: MainUiState, modifier: Mo
                         )
                     }
                     Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(CctrColors.BorderHairline))
+                    val captchaImage = remember(state.captchaBitmap) { state.captchaBitmap?.asImageBitmap() }
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -994,8 +1039,8 @@ private fun AtelierAuthSheet(vm: MainViewModel, state: MainUiState, modifier: Mo
                     ) {
                         when {
                             state.captchaLoading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 1.8.dp, color = CctrColors.InkPrimary)
-                            state.captchaBitmap != null -> Image(
-                                bitmap = state.captchaBitmap!!.asImageBitmap(),
+                            captchaImage != null -> Image(
+                                bitmap = captchaImage,
                                 contentDescription = "刷新验证码",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize().padding(3.dp)
@@ -1038,11 +1083,16 @@ private fun PracticePickerView(vm: MainViewModel, state: MainUiState, isTablet: 
                 it.teacherName.contains(kw, ignoreCase = true)
         }
     }
-    val selectedList = state.practices.filter { it.id in state.selectedPracticeIds }
-    val estCount = selectedList.sumOf { it.questionCount ?: 0 }
+    val tabletRows = remember(filtered, isTablet) {
+        if (isTablet) filtered.chunked(2) else emptyList()
+    }
+    val selectedList = remember(state.practices, state.selectedPracticeIds) {
+        state.practices.filter { it.id in state.selectedPracticeIds }
+    }
+    val estCount = remember(selectedList) { selectedList.sumOf { it.questionCount ?: 0 } }
 
     Column(
-        modifier = Modifier.widthIn(max = if (isTablet) 960.dp else 640.dp).fillMaxWidth(),
+        modifier = Modifier.widthIn(max = if (isTablet) 960.dp else 640.dp).fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Row(
@@ -1063,26 +1113,27 @@ private fun PracticePickerView(vm: MainViewModel, state: MainUiState, isTablet: 
             )
         }
 
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = if (isTablet) 500.dp else 400.dp)
-                .verticalScroll(rememberScrollState()),
+                .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (filtered.isEmpty()) {
-                Surface(
-                    color = CctrColors.BgSurface,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, CctrColors.BorderHairline),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("没有匹配的课程练习", fontSize = 13.sp, color = CctrColors.InkMuted)
+                item(key = "empty") {
+                    Surface(
+                        color = CctrColors.BgSurface,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(modifier = Modifier.padding(32.dp), contentAlignment = Alignment.Center) {
+                            Text("没有匹配的课程练习", fontSize = 13.sp, color = CctrColors.InkMuted)
+                        }
                     }
                 }
             } else if (isTablet) {
-                filtered.chunked(2).forEach { pair ->
+                items(tabletRows, key = { row -> "row_${row.first().id}" }) { pair ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         pair.forEach { p ->
                             Box(modifier = Modifier.weight(1f)) {
@@ -1098,7 +1149,7 @@ private fun PracticePickerView(vm: MainViewModel, state: MainUiState, isTablet: 
                     }
                 }
             } else {
-                filtered.forEach { p ->
+                items(filtered, key = { p -> p.id }) { p ->
                     PracticeLedgerCard(
                         item = p,
                         checked = p.id in state.selectedPracticeIds,
@@ -1270,12 +1321,42 @@ private fun ExportStatusBanner(vm: MainViewModel, state: MainUiState) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when {
                 state.exporting -> {
-                    Text("正在后台制版与校验…", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth().height(3.dp),
-                        color = CctrColors.InkPrimary,
-                        trackColor = CctrColors.BgSubtle
-                    )
+                    val targetProg = state.exportProgress
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("正在多线程制版与校验…", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                        if (targetProg != null) {
+                            Text(
+                                "${(targetProg * 100f).roundToInt()}%",
+                                fontSize = 11.5.sp,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                color = CctrColors.InkPrimary
+                            )
+                        }
+                    }
+                    if (targetProg != null) {
+                        val animProg by animateFloatAsState(
+                            targetValue = targetProg.coerceIn(0f, 1f),
+                            animationSpec = tween(180),
+                            label = "exportProgress"
+                        )
+                        LinearProgressIndicator(
+                            progress = { animProg },
+                            modifier = Modifier.fillMaxWidth().height(3.dp),
+                            color = CctrColors.InkPrimary,
+                            trackColor = CctrColors.BgSubtle
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().height(3.dp),
+                            color = CctrColors.InkPrimary,
+                            trackColor = CctrColors.BgSubtle
+                        )
+                    }
                     Text(state.exportProgressText, fontSize = 11.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkSecondary)
                 }
                 err != null -> {
@@ -1586,7 +1667,12 @@ private fun AuditLogsStage(vm: MainViewModel, state: MainUiState, isTablet: Bool
                     }
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(state.logs.reversed()) { line ->
+                        items(
+                            count = state.logs.size,
+                            key = { idx -> state.logs[state.logs.lastIndex - idx].id }
+                        ) { idx ->
+                            val entry = state.logs[state.logs.lastIndex - idx]
+                            val line = entry.text
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text(
                                     text = line,
@@ -1622,6 +1708,9 @@ private fun ArchiveFilesStage(state: MainUiState, isTablet: Boolean) {
         }
         return
     }
+    val tabletRows = remember(state.savedFiles, isTablet) {
+        if (isTablet) state.savedFiles.chunked(2) else emptyList()
+    }
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
             modifier = Modifier
@@ -1632,19 +1721,19 @@ private fun ArchiveFilesStage(state: MainUiState, isTablet: Boolean) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (isTablet) {
-                items(state.savedFiles.chunked(2)) { pair ->
+                items(tabletRows, key = { row -> row.first().path }) { pair ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        pair.forEach { file ->
+                        pair.forEach { item ->
                             Box(modifier = Modifier.weight(1f)) {
-                                ArchiveFileRowCard(context, file)
+                                ArchiveFileRowCard(context, item)
                             }
                         }
                         if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             } else {
-                items(state.savedFiles) { file ->
-                    ArchiveFileRowCard(context, file)
+                items(state.savedFiles, key = { item -> item.path }) { item ->
+                    ArchiveFileRowCard(context, item)
                 }
             }
         }
@@ -1652,13 +1741,12 @@ private fun ArchiveFilesStage(state: MainUiState, isTablet: Boolean) {
 }
 
 @Composable
-private fun ArchiveFileRowCard(context: Context, file: File) {
-    val ext = file.extension.uppercase().ifBlank { "FILE" }
+private fun ArchiveFileRowCard(context: Context, item: SavedFileUi) {
     Surface(
         color = CctrColors.BgSurface,
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(1.dp, CctrColors.BorderHairline),
-        modifier = Modifier.fillMaxWidth().clickable { openExportedFile(context, file) }
+        modifier = Modifier.fillMaxWidth().clickable { openExportedFile(context, item.file) }
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -1671,7 +1759,7 @@ private fun ArchiveFileRowCard(context: Context, file: File) {
                 shape = RoundedCornerShape(4.dp)
             ) {
                 Text(
-                    text = ext,
+                    text = item.ext,
                     fontSize = 10.sp,
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.SemiBold,
@@ -1680,8 +1768,8 @@ private fun ArchiveFileRowCard(context: Context, file: File) {
                 )
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(file.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("${file.length() / 1024} KB · 点击打开或分享成稿", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted, maxLines = 1)
+                Text(item.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${item.sizeKb} KB · 点击打开或分享成稿", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted, maxLines = 1)
             }
         }
     }

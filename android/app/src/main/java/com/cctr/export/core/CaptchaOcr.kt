@@ -20,7 +20,14 @@ class CaptchaOcr(context: Context) : AutoCloseable {
 
     init {
         val modelBytes = context.assets.open("common_old.onnx").use { it.readBytes() }
-        session = env.createSession(modelBytes, OrtSession.SessionOptions())
+        val opts = OrtSession.SessionOptions().apply {
+            setIntraOpNumThreads(2)
+        }
+        try {
+            session = env.createSession(modelBytes, opts)
+        } finally {
+            opts.close()
+        }
         val charsetJson = context.assets.open("ddddocr_charset.json").bufferedReader().use { it.readText() }
         val arr = JSONArray(charsetJson)
         charset = List(arr.length()) { i -> arr.optString(i, "") }

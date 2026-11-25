@@ -24,6 +24,11 @@ object Integrity {
         "^https?://(?:[a-z0-9-]+\\.)*(?:cctrcloud\\.net|aliyuncs\\.com)(?::(?:80|443))?/",
         RegexOption.IGNORE_CASE
     )
+    private val IMG_TAG_SRC_RE = Regex(
+        "(<img\\b[^>]*?\\bsrc\\s*=\\s*)(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))",
+        RegexOption.IGNORE_CASE
+    )
+    private val IMG_TAG_COUNT_RE = Regex("<img\\b", RegexOption.IGNORE_CASE)
     private val TAG_RE = Regex("<(/?)([a-zA-Z][a-zA-Z0-9_.:-]*)([^>]*)>", RegexOption.DOT_MATCHES_ALL)
     private val ATTR_RE = Regex("([a-zA-Z_:][-a-zA-Z0-9_.:]*)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))")
     private val ENTITY_RE = Regex("&(?:#\\d+|#x[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]{1,15});")
@@ -58,7 +63,7 @@ object Integrity {
             await document.fonts.ready;
           }
           const images = Array.from(document.images || []);
-          for (const image of images) {
+          const decodeResults = await Promise.all(images.map(async (image) => {
             let decoded = false;
             const origSrc = image.getAttribute('src') || '';
             for (let attempt = 0; attempt < 3; attempt++) {
@@ -75,12 +80,19 @@ object Integrity {
               }
             }
             if (!decoded) {
-              return JSON.stringify({ ok: false, error: '图片或公式加载失败：' + origSrc.slice(0, 80) });
+              return { ok: false, error: '图片或公式加载失败：' + origSrc.slice(0, 80) };
             }
             if (!image.naturalWidth || !image.naturalHeight) {
-              return JSON.stringify({ ok: false, error: '图片或公式内容为空' });
+              return { ok: false, error: '图片或公式内容为空' };
             }
+            return { ok: true };
+          }));
+          const failedDecode = decodeResults.find(r => !r.ok);
+          if (failedDecode) {
+            return JSON.stringify(failedDecode);
+          }
 
+          for (const image of images) {
             const src = image.getAttribute('src') || '';
             const isSvgData = /^data:image\/svg\+xml/i.test(src);
             const host = image.closest('article, .option-body, .content') || document.body;
@@ -435,6 +447,105 @@ object Integrity {
             article:last-child { border-bottom: none; }
             </style></head><body data-smart-pagination="${if (smartPagination) "1" else "0"}">${if (includeHeader) "<h1>${escapeText(title)}</h1>" else ""}$body</body></html>
         """.trimIndent()
+    }
+
+    fun normalizeAllowedImageUrl(url: String): String? {
+        val decoded = url.trim().replace("&amp;", "&")
+        if (!IMG_HTTPS_RE.containsMatchIn(decoded)) return null
+        return if (decoded.startsWith("http://", ignoreCase = true)) {
+            "https://" + decoded.substring(7)
+        } else {
+            decoded
+        }
+    }
+
+    fun extractAllowedRemoteImageUrls(questions: List<QuestionItem>): Set<String> {
+        val urls = LinkedHashSet<String>()
+        fun scan(html: String) {
+            if (!html.contains("http", ignoreCase = true)) return
+            for (m in IMG_TAG_SRC_RE.findAll(html)) {
+                val raw = m.groupValues[2].ifEmpty { m.groupValues[3].ifEmpty { m.groupValues[4] } }
+                normalizeAllowedImageUrl(raw)?.let { urls.add(it) }
+            }
+        }
+        for (q in questions) {
+            scan(q.subjectHtml)
+            scan(q.answer)
+            scan(q.analysisHtml)
+            q.options.forEach { scan(it.html) }
+        }
+        return urls
+    }
+
+    fun applyInlinedImages(
+        questions: List<QuestionItem>,
+        urlToDataUri: Map<String, String>
+    ): List<QuestionItem> {
+        if (urlToDataUri.isEmpty()) return questions
+        fun replaceField(html: String): String {
+            if (!html.contains("http", ignoreCase = true)) return html
+            return IMG_TAG_SRC_RE.replace(html) { m ->
+                val raw = m.groupValues[2].ifEmpty { m.groupValues[3].ifEmpty { m.groupValues[4] } }
+                val norm = normalizeAllowedImageUrl(raw)
+                val dataUri = norm?.let { urlToDataUri[it] }
+                if (dataUri != null) {
+                    "${m.groupValues[1]}\"$dataUri\""
+                } else {
+                    m.value
+                }
+            }
+        }
+        return questions.map { q ->
+            q.copy(
+                subjectHtml = replaceField(q.subjectHtml),
+                answer = replaceField(q.answer),
+                analysisHtml = replaceField(q.analysisHtml),
+                options = q.options.map { opt -> opt.copy(html = replaceField(opt.html)) }
+            )
+        }
+    }
+
+    fun buildAdaptiveQuestionChunks(
+        questions: List<QuestionItem>,
+        maxQuestions: Int = 24,
+        maxHtmlChars: Int = 24_000,
+        maxImages: Int = 28
+    ): List<List<QuestionItem>> {
+        if (questions.isEmpty()) return emptyList()
+        val chunks = ArrayList<List<QuestionItem>>()
+        var current = ArrayList<QuestionItem>(maxQuestions.coerceAtLeast(1))
+        var curChars = 0
+        var curImages = 0
+
+        for (q in questions) {
+            var qChars = q.subjectHtml.length + q.answer.length + q.analysisHtml.length
+            var qImgs = IMG_TAG_COUNT_RE.findAll(q.subjectHtml).count() +
+                IMG_TAG_COUNT_RE.findAll(q.answer).count() +
+                IMG_TAG_COUNT_RE.findAll(q.analysisHtml).count()
+            for (opt in q.options) {
+                qChars += opt.html.length
+                qImgs += IMG_TAG_COUNT_RE.findAll(opt.html).count()
+            }
+
+            if (current.isNotEmpty() && (
+                    current.size >= maxQuestions ||
+                    curChars + qChars > maxHtmlChars ||
+                    curImages + qImgs > maxImages
+                )
+            ) {
+                chunks.add(current)
+                current = ArrayList(maxQuestions.coerceAtLeast(1))
+                curChars = 0
+                curImages = 0
+            }
+            current.add(q)
+            curChars += qChars
+            curImages += qImgs
+        }
+        if (current.isNotEmpty()) {
+            chunks.add(current)
+        }
+        return chunks
     }
 
     fun safeArchiveSegment(value: String): String {
