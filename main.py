@@ -141,12 +141,16 @@ def main():
 
         from PySide6.QtCore import QCoreApplication, Qt
         from PySide6.QtGui import QFont
+        from PySide6.QtNetwork import QNetworkProxy, QNetworkProxyFactory
         from PySide6.QtWidgets import QApplication
         from cctr_export.core.database import init_db
         from cctr_export.ui import MainWindow
 
         QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
         app = QApplication(sys.argv)
+        # 校园网与国内教育平台直连优先，避免本地 Clash/VPN 系统代理破坏 TLS 握手导致内置浏览器白屏
+        QNetworkProxyFactory.setUseSystemConfiguration(False)
+        QNetworkProxy.setApplicationProxy(QNetworkProxy(QNetworkProxy.ProxyType.NoProxy))
         app.setApplicationName("CCTRCloud Export Studio")
         app.setStyle("Fusion")
         app.setFont(QFont("Microsoft YaHei UI", 10))

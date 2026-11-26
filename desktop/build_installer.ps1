@@ -6,13 +6,16 @@ if (-not (Test-Path $csc)) {
     throw "未找到 .NET Framework x64 编译器: $csc"
 }
 
-$desktopExe = Join-Path $root "成品\CCTRCloudExportDesktop.exe"
-if (-not (Test-Path $desktopExe)) {
-    $desktopExe = Join-Path $root "dist\CCTRCloudExportDesktop.exe"
-}
-if (-not (Test-Path $desktopExe)) {
+$distExe = Join-Path $root "dist\CCTRCloudExportDesktop.exe"
+$outExe = Join-Path $root "成品\CCTRCloudExportDesktop.exe"
+if ((Test-Path $distExe) -and ((-not (Test-Path $outExe)) -or ((Get-Item $distExe).LastWriteTime -ge (Get-Item $outExe).LastWriteTime))) {
+    $desktopExe = $distExe
+} elseif (Test-Path $outExe) {
+    $desktopExe = $outExe
+} else {
     throw "请先构建 CCTRCloudExportDesktop.exe"
 }
+Write-Host "使用桌面端二进制打包安装包: $desktopExe"
 
 $stage = Join-Path $root "build\installer_stage"
 if (Test-Path $stage) {

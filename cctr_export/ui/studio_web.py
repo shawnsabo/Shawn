@@ -12,6 +12,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QFile, QIODevice, QObject, QSize, QThread, QTimer, QUrl, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtNetwork import QNetworkProxy, QNetworkProxyFactory
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineScript, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -22,8 +23,10 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from ..core.api import CCTRClient
@@ -376,49 +379,46 @@ class _CaptureDecryptWorker(QThread):
 class PlatformBrowserDialog(QDialog):
     """内置多平台登录与作业捕获浏览器（持久化 Cookie，支持学习通 font-cxsecret 与雨课堂字体还原）。"""
 
+    _CHROME_UA = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
+
     def __init__(self, parent=None, initial_key: str = "chaoxing"):
         super().__init__(parent)
         self.setWindowTitle("CCTR Atelier · 网页登录与题库捕获（学习通 / 雨课堂）")
-        self.resize(1180, 780)
+        self.resize(1180, 800)
         self.captured_practices: list[dict] = []
         self._workers: list[QThread] = []
+        self._direct_mode = True
+        self._last_requested_url = ""
+        self._showing_error_page = False
+
+        # 打开内置浏览器时默认直连教育平台，避免本地 Clash/VPN 代理握手中断造成白屏
+        self._apply_proxy_mode(direct=True)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        bar = QWidget_bar = QHBoxLayout()
-        bar.setContentsMargins(12, 8, 12, 8)
-        bar.setSpacing(8)
+        top_wrap = QWidget(self)
+        top_wrap.setStyleSheet("background:#f4f3ef;border-bottom:1px solid #e2dfd7;")
+        top_box = QVBoxLayout(top_wrap)
+        top_box.setContentsMargins(12, 8, 12, 8)
+        top_box.setSpacing(6)
 
-        preset_row = QHBoxLayout()
-        preset_row.setSpacing(6)
-        for key, (label, url) in PLATFORM_PRESETS.items():
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
+        for _key, (label, url) in PLATFORM_PRESETS.items():
             btn = QPushButton(label, self)
             btn.setStyleSheet(
                 "QPushButton{padding:5px 10px;border:1px solid #cbc7bd;border-radius:5px;background:#faf9f6;color:#141413;font-size:12px;}"
                 "QPushButton:hover{background:#eae7e0;}"
             )
-            btn.clicked.connect(lambda _chk=False, u=url: self._web.load(QUrl(u)))
-            preset_row.addWidget(btn)
-        bar.addLayout(preset_row)
+            btn.clicked.connect(lambda _chk=False, u=url: self._navigate(u))
+            row1.addWidget(btn)
 
-        back_btn = QPushButton("←", self)
-        back_btn.setFixedWidth(32)
-        reload_btn = QPushButton("↻", self)
-        reload_btn.setFixedWidth(32)
-        for b in (back_btn, reload_btn):
-            b.setStyleSheet("QPushButton{padding:5px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;}")
-        bar.addWidget(back_btn)
-        bar.addWidget(reload_btn)
-
-        self._url_edit = QLineEdit(self)
-        self._url_edit.setStyleSheet("padding:5px 9px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;font-size:12px;")
-        bar.addWidget(self._url_edit, 1)
-
-        self._status_lbl = QLabel("请正常扫码或输入账号密码登录，然后打开作业/测验详情页", self)
-        self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 6px;")
-        bar.addWidget(self._status_lbl)
+        row1.addStretch(1)
 
         self._extract_btn = QPushButton("提取本页题目", self)
         self._extract_btn.setStyleSheet(
@@ -426,7 +426,7 @@ class PlatformBrowserDialog(QDialog):
             "QPushButton:hover{background:#18573f;}"
             "QPushButton:disabled{opacity:0.5;background:#8a867e;}"
         )
-        bar.addWidget(self._extract_btn)
+        row1.addWidget(self._extract_btn)
 
         self._finish_btn = QPushButton("送入工作台 (0)", self)
         self._finish_btn.setEnabled(False)
@@ -434,15 +434,60 @@ class PlatformBrowserDialog(QDialog):
             "QPushButton{padding:6px 14px;border:none;border-radius:5px;background:#141413;color:#faf9f6;font-weight:600;font-size:12px;}"
             "QPushButton:disabled{background:#cbc7bd;color:#57544e;}"
         )
-        bar.addWidget(self._finish_btn)
+        row1.addWidget(self._finish_btn)
+        top_box.addLayout(row1)
 
-        bar_container = self._wrap_bar(bar)
-        root.addWidget(bar_container)
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+
+        back_btn = QPushButton("←", self)
+        back_btn.setFixedWidth(32)
+        reload_btn = QPushButton("↻", self)
+        reload_btn.setFixedWidth(32)
+        for b in (back_btn, reload_btn):
+            b.setStyleSheet("QPushButton{padding:5px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;}")
+        row2.addWidget(back_btn)
+        row2.addWidget(reload_btn)
+
+        self._url_edit = QLineEdit(self)
+        self._url_edit.setPlaceholderText("输入或粘贴学习通/雨课堂/学校测验网址，回车访问…")
+        self._url_edit.setStyleSheet("padding:5px 10px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;font-size:12px;")
+        row2.addWidget(self._url_edit, 1)
+
+        self._proxy_btn = QPushButton("直连模式 ✓", self)
+        self._proxy_btn.setToolTip("默认直连国内教务/题库站点以避开代理握手失败；如需校园代理可点击切换")
+        self._proxy_btn.setStyleSheet(
+            "QPushButton{padding:5px 10px;border:1px solid #b5cfc4;border-radius:5px;background:#eef6f2;color:#1e6b4e;font-size:12px;font-weight:600;}"
+            "QPushButton:hover{background:#dceee5;}"
+        )
+        self._proxy_btn.clicked.connect(self._toggle_proxy_mode)
+        row2.addWidget(self._proxy_btn)
+
+        self._status_lbl = QLabel("正在连接平台页面…", self)
+        self._status_lbl.setMinimumWidth(250)
+        self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 4px;")
+        row2.addWidget(self._status_lbl)
+
+        top_box.addLayout(row2)
+        root.addWidget(top_wrap)
+
+        self._progress = QProgressBar(self)
+        self._progress.setFixedHeight(3)
+        self._progress.setTextVisible(False)
+        self._progress.setRange(0, 100)
+        self._progress.setStyleSheet(
+            "QProgressBar{border:none;background:#eae7e0;}"
+            "QProgressBar::chunk{background:#1e6b4e;}"
+        )
+        root.addWidget(self._progress)
 
         profile_dir = Path.home() / ".cctr_export" / "browser_profile"
-        profile_dir.mkdir(parents=True, exist_ok=True)
+        (profile_dir / "storage").mkdir(parents=True, exist_ok=True)
+        (profile_dir / "cache").mkdir(parents=True, exist_ok=True)
         self._profile = QWebEngineProfile("cctr_atelier_browser", self)
-        self._profile.setPersistentStoragePath(str(profile_dir))
+        self._profile.setHttpUserAgent(self._CHROME_UA)
+        self._profile.setPersistentStoragePath(str(profile_dir / "storage"))
+        self._profile.setCachePath(str(profile_dir / "cache"))
         self._profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
 
         hook = QWebEngineScript()
@@ -456,13 +501,19 @@ class PlatformBrowserDialog(QDialog):
         self._page = QWebEnginePage(self._profile, self)
         self._web = QWebEngineView(self)
         self._web.setPage(self._page)
-        self._web.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        s = self._web.settings()
+        s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.LocalStorageEnabled, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         root.addWidget(self._web, 1)
 
         back_btn.clicked.connect(self._web.back)
-        reload_btn.clicked.connect(self._web.reload)
-        self._url_edit.returnPressed.connect(lambda: self._web.load(QUrl.fromUserInput(self._url_edit.text().strip())))
-        self._web.urlChanged.connect(lambda u: self._url_edit.setText(u.toString()))
+        reload_btn.clicked.connect(lambda: self._navigate(self._last_requested_url or self._url_edit.text().strip()))
+        self._url_edit.returnPressed.connect(lambda: self._navigate(self._url_edit.text().strip()))
+        self._web.urlChanged.connect(self._on_url_changed)
+        self._web.loadStarted.connect(self._on_load_started)
+        self._web.loadProgress.connect(self._on_load_progress)
+        self._web.loadFinished.connect(self._on_load_finished)
         self._extract_btn.clicked.connect(self._on_extract_clicked)
         self._finish_btn.clicked.connect(self.accept)
 
@@ -471,18 +522,93 @@ class PlatformBrowserDialog(QDialog):
         self._probe_timer.start(1500)
 
         _, start_url = PLATFORM_PRESETS.get(initial_key, PLATFORM_PRESETS["chaoxing"])
-        self._web.load(QUrl(start_url))
+        self._navigate(start_url)
 
-    @staticmethod
-    def _wrap_bar(layout: QHBoxLayout):
-        from PySide6.QtWidgets import QWidget
-        w = QWidget()
-        w.setStyleSheet("background:#f4f3ef;border-bottom:1px solid #e2dfd7;")
-        w.setLayout(layout)
-        return w
+    def _apply_proxy_mode(self, direct: bool) -> None:
+        self._direct_mode = direct
+        if direct:
+            QNetworkProxyFactory.setUseSystemConfiguration(False)
+            QNetworkProxy.setApplicationProxy(QNetworkProxy(QNetworkProxy.ProxyType.NoProxy))
+        else:
+            QNetworkProxy.setApplicationProxy(QNetworkProxy(QNetworkProxy.ProxyType.DefaultProxy))
+            QNetworkProxyFactory.setUseSystemConfiguration(True)
+
+    def _toggle_proxy_mode(self) -> None:
+        self._apply_proxy_mode(not self._direct_mode)
+        if self._direct_mode:
+            self._proxy_btn.setText("直连模式 ✓")
+            self._proxy_btn.setStyleSheet(
+                "QPushButton{padding:5px 10px;border:1px solid #b5cfc4;border-radius:5px;background:#eef6f2;color:#1e6b4e;font-size:12px;font-weight:600;}"
+            )
+        else:
+            self._proxy_btn.setText("系统代理")
+            self._proxy_btn.setStyleSheet(
+                "QPushButton{padding:5px 10px;border:1px solid #d7c39a;border-radius:5px;background:#fdf6e9;color:#925911;font-size:12px;font-weight:600;}"
+            )
+        if self._last_requested_url:
+            self._navigate(self._last_requested_url)
+
+    def _navigate(self, raw_url: str) -> None:
+        target = (raw_url or "").strip()
+        if not target:
+            return
+        u = QUrl.fromUserInput(target)
+        self._showing_error_page = False
+        self._last_requested_url = u.toString()
+        self._url_edit.setText(self._last_requested_url)
+        self._web.load(u)
+
+    def _on_url_changed(self, url: QUrl) -> None:
+        s = url.toString()
+        if not s or s.startswith(("data:", "about:", "chrome-error:")):
+            return
+        self._last_requested_url = s
+        if not self._url_edit.hasFocus():
+            self._url_edit.setText(s)
+
+    def _on_load_started(self) -> None:
+        if not self._showing_error_page:
+            self._progress.setVisible(True)
+            self._progress.setValue(12)
+            self._status_lbl.setText("正在加载网页，请稍候…")
+            self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 4px;")
+
+    def _on_load_progress(self, pct: int) -> None:
+        if not self._showing_error_page:
+            self._progress.setVisible(True)
+            self._progress.setValue(max(5, pct))
+
+    def _on_load_finished(self, ok: bool) -> None:
+        self._progress.setVisible(False)
+        if ok:
+            self._showing_error_page = False
+            return
+        if self._showing_error_page:
+            return
+        self._showing_error_page = True
+        failed_url = self._last_requested_url or self._url_edit.text().strip()
+        mode_hint = "当前为「直连模式」" if self._direct_mode else "当前为「系统代理模式」"
+        self._status_lbl.setText("✗ 页面加载失败，请切换代理或检查网络后点击 ↻ 重试")
+        self._status_lbl.setStyleSheet("color:#c83e2b;font-weight:600;font-size:12px;padding:0 4px;")
+        safe_url = failed_url.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        err_html = (
+            "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><style>"
+            "body{margin:0;padding:48px 28px;font-family:'Microsoft YaHei UI',sans-serif;background:#faf9f6;color:#141413;}"
+            ".card{max-width:620px;margin:0 auto;background:#fff;border:1px solid #e2dfd7;border-radius:10px;padding:28px;}"
+            "h2{margin:0 0 10px;font-size:18px;color:#b91c1c;}p{margin:8px 0;font-size:13.5px;line-height:1.7;color:#44403c;}"
+            "code{background:#f4f3ef;padding:2px 6px;border-radius:4px;word-break:break-all;}"
+            "</style></head><body><div class='card'>"
+            "<h2>无法打开当前网页</h2>"
+            f"<p>目标地址：<code>{safe_url}</code>（{mode_hint}）</p>"
+            "<p>可能原因：<br>1. 本机代理或防火墙拦截了教育平台 HTTPS 握手；可点击上方地址栏右侧的「直连模式 / 系统代理」按钮切换后重试。<br>"
+            "2. 未连接校园网 / VPN 或网页暂时超时；也可先用浏览器导出/保存，或在主界面选择「本地导入题库」。</p>"
+            "<p>请点击上方 <b>↻ 刷新</b> 或切换顶部平台按钮重试。</p>"
+            "</div></body></html>"
+        )
+        self._web.setHtml(err_html, QUrl("https://localhost/cctr-error"))
 
     def _probe_page(self):
-        if not self.isVisible():
+        if not self.isVisible() or self._showing_error_page:
             return
         self._page.runJavaScript(DETECT_PAGE_STATUS_JS, self._on_probe_result)
 
