@@ -9,10 +9,11 @@
 
 ## 直接运行成品
 
-前往 [v4.0.0 发布页面](https://github.com/shawnmark2023-lgtm/Shawn/releases/tag/v4.0.0) 下载成品；源码仓库不包含 `成品/` 文件夹中的安装包：
+前往 [最新发布页面 (v4.2.0)](https://github.com/shawnsabo/Shawn/releases/latest) 下载成品；源码仓库不包含 `成品/` 文件夹中的安装包：
 
-- `CCTRCloudExportDesktop.exe`：Windows 桌面版独立单文件程序（内置 `ddddocr` 自动识别验证码、浏览器内核自选与便携 Chromium 下载）。
-- `CCTRCloudExportAndroid.apk`：Android 移动端安装包（内置 ONNX 离线自动识别验证码、A4 无损 PDF 与分类 ZIP 导出）。
+- `CCTRCloudExportSetup.exe`：Windows 图形一键安装包（无需管理员权限，自动释放整合完整运行时的桌面端、自检环境与代理组件，并支持系统「应用和功能」与独立 `Uninstall.exe` 标准卸载）。
+- `CCTRCloudExportDesktop.exe`：Windows 桌面版免安装绿色单文件程序（内置 VS2022 VC++ 运行时、Python 3.13、`QtWebEngine`、`ddddocr` 离线识码与 `socksio` SOCKS5 代理支持）。
+- `CCTRCloudExportAndroid.apk`：Android 移动端与平板通用安装包（Editorial Atelier 自适应双栏界面、端侧 ONNX 自动识码、多线程并发拉题与多平台导出）。
 
 ---
 
@@ -49,12 +50,13 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-单文件构建：`desktop\build_desktop.bat`（输出到 `成品\CCTRCloudExportDesktop.exe`）。
+单文件构建：`desktop\build_desktop.bat`（输出到 `成品\CCTRCloudExportDesktop.exe`）。  
+一键安装包构建：`powershell -ExecutionPolicy Bypass -File desktop\build_installer.ps1`（输出到 `成品\CCTRCloudExportSetup.exe`）。
 
 ### 安卓端
 
 ```bat
-android\gradlew.bat -p android testDebugUnitTest assembleDebug
+android\gradlew.bat -p android testDebugUnitTest assembleRelease
 ```
 
 ---
