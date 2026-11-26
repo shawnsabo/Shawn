@@ -393,6 +393,9 @@ class PlatformBrowserDialog(QDialog):
         self._direct_mode = True
         self._last_requested_url = ""
         self._showing_error_page = False
+        self._is_loading = False
+        self._nav_history: list[str] = []
+        self._history_idx = -1
 
         # 打开内置浏览器时默认直连教育平台，避免本地 Clash/VPN 代理握手中断造成白屏
         self._apply_proxy_mode(direct=True)
@@ -440,14 +443,21 @@ class PlatformBrowserDialog(QDialog):
         row2 = QHBoxLayout()
         row2.setSpacing(6)
 
-        back_btn = QPushButton("←", self)
-        back_btn.setFixedWidth(32)
-        reload_btn = QPushButton("↻", self)
-        reload_btn.setFixedWidth(32)
-        for b in (back_btn, reload_btn):
-            b.setStyleSheet("QPushButton{padding:5px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;}")
-        row2.addWidget(back_btn)
-        row2.addWidget(reload_btn)
+        self._back_btn = QPushButton("←", self)
+        self._back_btn.setFixedWidth(34)
+        self._back_btn.setToolTip("返回上一页")
+        self._back_btn.setEnabled(False)
+        self._reload_btn = QPushButton("↻", self)
+        self._reload_btn.setFixedWidth(34)
+        self._reload_btn.setToolTip("强制停止并重新加载当前页面")
+        for b in (self._back_btn, self._reload_btn):
+            b.setStyleSheet(
+                "QPushButton{padding:5px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;}"
+                "QPushButton:hover{background:#eae7e0;}"
+                "QPushButton:disabled{color:#b6b2a9;background:#f4f3ef;}"
+            )
+        row2.addWidget(self._back_btn)
+        row2.addWidget(self._reload_btn)
 
         self._url_edit = QLineEdit(self)
         self._url_edit.setPlaceholderText("输入或粘贴学习通/雨课堂/学校测验网址，回车访问…")
@@ -507,8 +517,8 @@ class PlatformBrowserDialog(QDialog):
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         root.addWidget(self._web, 1)
 
-        back_btn.clicked.connect(self._web.back)
-        reload_btn.clicked.connect(lambda: self._navigate(self._last_requested_url or self._url_edit.text().strip()))
+        self._back_btn.clicked.connect(self._on_back_clicked)
+        self._reload_btn.clicked.connect(self._on_reload_clicked)
         self._url_edit.returnPressed.connect(lambda: self._navigate(self._url_edit.text().strip()))
         self._web.urlChanged.connect(self._on_url_changed)
         self._web.loadStarted.connect(self._on_load_started)
@@ -516,6 +526,10 @@ class PlatformBrowserDialog(QDialog):
         self._web.loadFinished.connect(self._on_load_finished)
         self._extract_btn.clicked.connect(self._on_extract_clicked)
         self._finish_btn.clicked.connect(self.accept)
+
+        self._load_watchdog = QTimer(self)
+        self._load_watchdog.setSingleShot(True)
+        self._load_watchdog.timeout.connect(self._on_load_timeout)
 
         self._probe_timer = QTimer(self)
         self._probe_timer.timeout.connect(self._probe_page)
@@ -534,7 +548,9 @@ class PlatformBrowserDialog(QDialog):
             QNetworkProxyFactory.setUseSystemConfiguration(True)
 
     def _toggle_proxy_mode(self) -> None:
+        self._web.stop()
         self._apply_proxy_mode(not self._direct_mode)
+        self._profile.clearHttpCache()
         if self._direct_mode:
             self._proxy_btn.setText("直连模式 ✓")
             self._proxy_btn.setStyleSheet(
@@ -545,33 +561,99 @@ class PlatformBrowserDialog(QDialog):
             self._proxy_btn.setStyleSheet(
                 "QPushButton{padding:5px 10px;border:1px solid #d7c39a;border-radius:5px;background:#fdf6e9;color:#925911;font-size:12px;font-weight:600;}"
             )
-        if self._last_requested_url:
-            self._navigate(self._last_requested_url)
+        target = self._last_requested_url or self._url_edit.text().strip()
+        if target:
+            self._navigate(target)
 
-    def _navigate(self, raw_url: str) -> None:
+    def _record_history(self, url_str: str) -> None:
+        if not url_str or url_str.startswith(("data:", "about:", "chrome-error:", "https://localhost/cctr-error")):
+            return
+        if self._history_idx >= 0 and self._nav_history[self._history_idx] == url_str:
+            self._sync_nav_buttons()
+            return
+        if self._history_idx < len(self._nav_history) - 1:
+            self._nav_history = self._nav_history[: self._history_idx + 1]
+        self._nav_history.append(url_str)
+        self._history_idx = len(self._nav_history) - 1
+        self._sync_nav_buttons()
+
+    def _sync_nav_buttons(self) -> None:
+        can_back = self._web.history().canGoBack() or self._history_idx > 0
+        self._back_btn.setEnabled(can_back)
+
+    def _on_back_clicked(self) -> None:
+        self._web.stop()
+        if self._history_idx > 0:
+            self._history_idx -= 1
+            prev_url = self._nav_history[self._history_idx]
+            self._navigate(prev_url, record=False)
+            return
+        if self._web.history().canGoBack():
+            self._showing_error_page = False
+            self._web.back()
+            self._sync_nav_buttons()
+
+    def _on_reload_clicked(self) -> None:
+        self._web.stop()
+        cur = self._web.url().toString()
+        target = self._last_requested_url or self._url_edit.text().strip()
+        if self._showing_error_page or not cur or cur.startswith(("data:", "about:", "chrome-error:", "https://localhost/cctr-error")):
+            if target:
+                self._navigate(target, record=False)
+            return
+        self._showing_error_page = False
+        self._is_loading = True
+        self._load_watchdog.start(15000)
+        self._progress.setVisible(True)
+        self._progress.setValue(12)
+        self._status_lbl.setText("正在重新加载页面…")
+        self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 4px;")
+        self._web.triggerPageAction(QWebEnginePage.WebAction.ReloadAndBypassCache)
+
+    def _on_load_timeout(self) -> None:
+        if self._is_loading and not self._showing_error_page:
+            self._status_lbl.setText("⏳ 加载较慢（15s），可点右侧切换直连/代理或点 ↻ 重试")
+            self._status_lbl.setStyleSheet("color:#925911;font-weight:600;font-size:12px;padding:0 4px;")
+
+    def _navigate(self, raw_url: str, *, record: bool = True) -> None:
         target = (raw_url or "").strip()
         if not target:
             return
         u = QUrl.fromUserInput(target)
+        url_str = u.toString()
+        self._web.stop()
         self._showing_error_page = False
-        self._last_requested_url = u.toString()
-        self._url_edit.setText(self._last_requested_url)
+        self._is_loading = True
+        self._last_requested_url = url_str
+        self._url_edit.setText(url_str)
+        if record:
+            self._record_history(url_str)
+        else:
+            self._sync_nav_buttons()
+        self._progress.setVisible(True)
+        self._progress.setValue(10)
+        self._status_lbl.setText("正在加载网页，请稍候…")
+        self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 4px;")
+        self._load_watchdog.start(15000)
         self._web.load(u)
 
     def _on_url_changed(self, url: QUrl) -> None:
         s = url.toString()
-        if not s or s.startswith(("data:", "about:", "chrome-error:")):
+        if not s or s.startswith(("data:", "about:", "chrome-error:", "https://localhost/cctr-error")):
             return
         self._last_requested_url = s
+        self._record_history(s)
         if not self._url_edit.hasFocus():
             self._url_edit.setText(s)
 
     def _on_load_started(self) -> None:
         if not self._showing_error_page:
+            self._is_loading = True
             self._progress.setVisible(True)
             self._progress.setValue(12)
             self._status_lbl.setText("正在加载网页，请稍候…")
             self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 4px;")
+            self._load_watchdog.start(15000)
 
     def _on_load_progress(self, pct: int) -> None:
         if not self._showing_error_page:
@@ -579,7 +661,10 @@ class PlatformBrowserDialog(QDialog):
             self._progress.setValue(max(5, pct))
 
     def _on_load_finished(self, ok: bool) -> None:
+        self._is_loading = False
+        self._load_watchdog.stop()
         self._progress.setVisible(False)
+        self._sync_nav_buttons()
         if ok:
             self._showing_error_page = False
             return
@@ -663,13 +748,26 @@ class PlatformBrowserDialog(QDialog):
         self._finish_btn.setEnabled(True)
         self._finish_btn.setText(f"送入工作台 ({len(self.captured_practices)})")
 
-    def closeEvent(self, event):
+    def _cleanup_browser(self) -> None:
+        if getattr(self, "_cleaned_up", False):
+            return
+        self._cleaned_up = True
+        self._load_watchdog.stop()
         self._probe_timer.stop()
         for w in list(self._workers):
             w.quit()
             w.wait(1500)
+        self._web.stop()
         self._web.setPage(None)
         self._page.deleteLater()
+        self._profile.deleteLater()
+
+    def done(self, r: int) -> None:
+        self._cleanup_browser()
+        super().done(r)
+
+    def closeEvent(self, event):
+        self._cleanup_browser()
         super().closeEvent(event)
 
 
@@ -849,20 +947,46 @@ class DesktopBridge(QObject):
 
     @Slot(str)
     def openPlatformBrowser(self, platform_key: str):
+        # 脱离 QWebChannel 同步 IPC 调用栈异步打开窗口，防止 Chromium 浏览器内核死锁导致白屏无法加载
+        key = platform_key or "chaoxing"
+        QTimer.singleShot(0, lambda k=key: self._show_platform_browser(k))
+
+    def _show_platform_browser(self, platform_key: str):
+        existing = getattr(self, "_platform_dlg", None)
+        if existing is not None:
+            try:
+                if existing.isVisible():
+                    _, url = PLATFORM_PRESETS.get(platform_key, PLATFORM_PRESETS["chaoxing"])
+                    existing._navigate(url)
+                    existing.raise_()
+                    existing.activateWindow()
+                    return
+            except Exception:
+                pass
         parent_w = self._main_win()
-        dlg = PlatformBrowserDialog(parent_w, initial_key=platform_key or "chaoxing")
-        dlg.exec()
-        if dlg.captured_practices:
-            self.externalBanksLoaded.emit(
-                json.dumps(
-                    {
-                        "ok": True,
-                        "sourceLabel": "学习通 / 雨课堂",
-                        "practices": dlg.captured_practices,
-                    },
-                    ensure_ascii=False,
+        dlg = PlatformBrowserDialog(parent_w, initial_key=platform_key)
+        dlg.setModal(False)
+        self._platform_dlg = dlg
+
+        def _on_finished(_res: int):
+            if getattr(dlg, "captured_practices", None):
+                self.externalBanksLoaded.emit(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "sourceLabel": "学习通 / 雨课堂",
+                            "practices": dlg.captured_practices,
+                        },
+                        ensure_ascii=False,
+                    )
                 )
-            )
+            if getattr(self, "_platform_dlg", None) is dlg:
+                self._platform_dlg = None
+
+        dlg.finished.connect(_on_finished)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
 
     @Slot()
     def importLocalFiles(self):
