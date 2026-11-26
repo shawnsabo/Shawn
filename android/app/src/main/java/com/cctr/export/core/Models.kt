@@ -6,9 +6,13 @@ enum class AnswerVariant(val key: String, val label: String) {
     WITHOUT_ANSWERS("withoutAnswers", "无答案")
 }
 
-enum class ExportFormat(val label: String, val subtitle: String) {
-    MERGED_PDF("合并单个 PDF", "A4 无损排版 · 跨页不截断"),
-    CATEGORIZED_ZIP("分类打包 ZIP", "学科/章节/题型 + 校验清单")
+enum class ExportFormat(val label: String, val subtitle: String, val ext: String, val mimeType: String) {
+    MERGED_PDF("合并单个 PDF", "A4 无损排版 · 跨页不截断", "pdf", "application/pdf"),
+    CATEGORIZED_ZIP("分类打包 ZIP", "学科/章节/题型 + 校验清单", "zip", "application/zip"),
+    EXCEL_XLSX("刷题 Excel (.xlsx)", "适配考试宝 / 磨题帮导入", "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ANKI_TSV("Anki 记忆卡 (.tsv)", "直接导入 Anki 卡片", "tsv", "text/tab-separated-values"),
+    MARKDOWN_MD("Markdown (.md)", "Notion / Obsidian 笔记", "md", "text/markdown"),
+    STANDARD_JSON("标准 JSON (.json)", "完整结构无损归档", "json", "application/json")
 }
 
 data class PracticeItem(

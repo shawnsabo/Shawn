@@ -11,14 +11,16 @@ android {
         applicationId = "com.cctr.export"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "4.0.0"
+        versionCode = 6
+        versionName = "4.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

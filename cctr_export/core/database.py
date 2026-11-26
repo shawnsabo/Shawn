@@ -20,6 +20,10 @@ class ExportType(str, Enum):
     PDF = "pdf"
     ZIP = "zip"
     IMG = "img"
+    XLSX = "xlsx"
+    ANKI = "anki"
+    MD = "md"
+    JSON = "json"
 
 
 class LogLevel(str, Enum):

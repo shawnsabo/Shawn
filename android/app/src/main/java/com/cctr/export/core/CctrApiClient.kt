@@ -1,13 +1,23 @@
 package com.cctr.export.core
 
 import android.util.Base64
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import okhttp3.ConnectionPool
 import okhttp3.Cookie
 import okhttp3.CookieJar
+import okhttp3.Dispatcher
 import okhttp3.FormBody
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.IOException
 import java.security.KeyFactory
 import java.security.spec.X509EncodedKeySpec
 import java.util.concurrent.TimeUnit
@@ -23,23 +33,33 @@ class CctrApiClient {
             "KIs7u+iN13xPFBY0kwIDAQAB"
     }
 
+    private val cookieLock = Any()
     private val cookieStore = HashMap<String, MutableList<Cookie>>()
 
     private val http = OkHttpClient.Builder()
+        .dispatcher(Dispatcher().apply {
+            maxRequests = 48
+            maxRequestsPerHost = 12
+        })
+        .connectionPool(ConnectionPool(12, 5, TimeUnit.MINUTES))
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(45, TimeUnit.SECONDS)
         .cookieJar(object : CookieJar {
             override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                val list = cookieStore.getOrPut(url.host) { mutableListOf() }
-                for (c in cookies) {
-                    list.removeAll { it.name == c.name }
-                    list.add(c)
+                synchronized(cookieLock) {
+                    val list = cookieStore.getOrPut(url.host) { mutableListOf() }
+                    for (c in cookies) {
+                        list.removeAll { it.name == c.name }
+                        list.add(c)
+                    }
                 }
             }
 
             override fun loadForRequest(url: HttpUrl): List<Cookie> {
                 val now = System.currentTimeMillis()
-                return cookieStore[url.host]?.filter { it.expiresAt >= now } ?: emptyList()
+                synchronized(cookieLock) {
+                    return cookieStore[url.host]?.filter { it.expiresAt >= now }?.toList() ?: emptyList()
+                }
             }
         })
         .build()
@@ -128,56 +148,76 @@ class CctrApiClient {
         return chapters to qtypes
     }
 
-    fun queryQuestions(
+    suspend fun queryQuestions(
         practice: PracticeItem,
         chapters: List<ChapterItem> = emptyList(),
         questionTypes: List<QuestionTypeItem> = emptyList(),
         practicedOnly: Boolean = false
-    ): List<QuestionItem> {
-        val (catChapters, catTypes) = runCatching { getChapterAndQuestionTypes(practice) }
-            .getOrElse { emptyList<ChapterItem>() to emptyList<QuestionTypeItem>() }
+    ): List<QuestionItem> = coroutineScope {
+        val (catChapters, catTypes) = withContext(Dispatchers.IO) {
+            runCatching { getChapterAndQuestionTypes(practice) }
+                .getOrElse { emptyList<ChapterItem>() to emptyList<QuestionTypeItem>() }
+        }
         val chapterMap = catChapters.associate { it.id to it.name }
         val chapterOrder = catChapters.mapIndexed { idx, c -> c.id to idx }.toMap()
         val typeMap = catTypes.associate { (it.questionTypeId.ifBlank { it.id }) to it.name }
         val typeOrder = catTypes.mapIndexed { idx, t -> (t.questionTypeId.ifBlank { t.id }) to idx }.toMap()
 
         val practiceTypes = if (practicedOnly) listOf(1) else listOf(0, 1)
+        val pageSemaphore = Semaphore(6)
+
+        val ptResults = practiceTypes.map { pt ->
+            async(Dispatchers.IO) {
+                val (firstRaw, split, reportedCount) = fetchPage(practice, 1, 100, chapters, questionTypes, pt, "")
+                if (firstRaw.isEmpty() && split.isEmpty()) {
+                    return@async reportedCount to emptyList<JSONObject>()
+                }
+
+                val splitCounts = split.filter { it.isNotBlank() }
+                    .map { s -> s.split(",").count { it.isNotBlank() } }
+                val expectedBucketCount = if (splitCounts.isNotEmpty()) splitCounts.sum() else null
+
+                if (split.isEmpty() && practiceTypes.size == 1 && reportedCount != null && firstRaw.size < reportedCount) {
+                    error("平台未提供完整分页游标（${firstRaw.size}/$reportedCount）")
+                }
+
+                val tailPages = (1 until split.size).map { i ->
+                    val cursor = split[i]
+                    require(cursor.isNotBlank()) { "第 ${i + 1} 页游标无效" }
+                    async(Dispatchers.IO) {
+                        pageSemaphore.withPermit {
+                            val (pageRaw, _, _) = fetchPage(practice, i + 1, 100, chapters, questionTypes, pt, cursor)
+                            require(pageRaw.isNotEmpty()) { "第 ${i + 1} 页为空，无法确认完整" }
+                            pageRaw
+                        }
+                    }
+                }.awaitAll()
+
+                val bucket = ArrayList<JSONObject>(firstRaw.size + tailPages.sumOf { it.size })
+                bucket.addAll(firstRaw)
+                tailPages.forEach { bucket.addAll(it) }
+
+                val bucketIds = HashSet<String>(bucket.size)
+                for (item in bucket) {
+                    val qid = item.optString("questionid", "").trim()
+                    require(qid.isNotBlank() && bucketIds.add(qid)) { "题目 ID 缺失或同页内重复：$qid" }
+                }
+                if (expectedBucketCount != null && bucket.size != expectedBucketCount) {
+                    error("分页题数不匹配：分片游标预期 $expectedBucketCount，实际获取 ${bucket.size}")
+                }
+                if (practiceTypes.size == 1 && reportedCount != null && bucket.size < reportedCount) {
+                    error("题数不匹配：平台报告 $reportedCount，实际获取 ${bucket.size}")
+                }
+                reportedCount to bucket
+            }
+        }.awaitAll()
+
         val rawAll = mutableListOf<JSONObject>()
         val seenIds = HashSet<String>()
         var observedReportedCount: Int? = null
-
-        for (pt in practiceTypes) {
-            val (firstRaw, split, reportedCount) = fetchPage(practice, 1, 100, chapters, questionTypes, pt, "")
+        for ((reportedCount, bucket) in ptResults) {
             if (reportedCount != null && observedReportedCount == null) {
                 observedReportedCount = reportedCount
-            }
-            if (firstRaw.isEmpty() && split.isEmpty()) continue
-
-            val bucket = mutableListOf<JSONObject>().apply { addAll(firstRaw) }
-            val splitCounts = split.filter { it.isNotBlank() }
-                .map { s -> s.split(",").count { it.isNotBlank() } }
-            val expectedBucketCount = if (splitCounts.isNotEmpty()) splitCounts.sum() else null
-
-            if (split.isEmpty() && practiceTypes.size == 1 && reportedCount != null && firstRaw.size < reportedCount) {
-                error("平台未提供完整分页游标（${firstRaw.size}/$reportedCount）")
-            }
-            for (i in 1 until split.size) {
-                val cursor = split[i]
-                require(cursor.isNotBlank()) { "第 ${i + 1} 页游标无效" }
-                val (pageRaw, _, _) = fetchPage(practice, i + 1, 100, chapters, questionTypes, pt, cursor)
-                require(pageRaw.isNotEmpty()) { "第 ${i + 1} 页为空，无法确认完整" }
-                bucket.addAll(pageRaw)
-            }
-            val bucketIds = HashSet<String>()
-            for (item in bucket) {
-                val qid = item.optString("questionid", "").trim()
-                require(qid.isNotBlank() && bucketIds.add(qid)) { "题目 ID 缺失或同页内重复：$qid" }
-            }
-            if (expectedBucketCount != null && bucket.size != expectedBucketCount) {
-                error("分页题数不匹配：分片游标预期 $expectedBucketCount，实际获取 ${bucket.size}")
-            }
-            if (practiceTypes.size == 1 && reportedCount != null && bucket.size != reportedCount) {
-                error("题数不匹配：平台报告 $reportedCount，实际获取 ${bucket.size}")
             }
             for (item in bucket) {
                 val qid = item.optString("questionid", "").trim()
@@ -187,13 +227,14 @@ class CctrApiClient {
         }
 
         if (!practicedOnly) {
-            if (observedReportedCount != null && rawAll.size != observedReportedCount) {
+            if (observedReportedCount != null && rawAll.size < observedReportedCount) {
                 error("练习「${practice.practiceName}」题数不匹配：接口报告 $observedReportedCount，实际获取 ${rawAll.size}")
             }
+            val expectedTotal = practice.questionCount
             if (chapters.isEmpty() && questionTypes.isEmpty() &&
-                practice.questionCount != null && rawAll.size != practice.questionCount
+                expectedTotal != null && rawAll.size < expectedTotal
             ) {
-                error("练习「${practice.practiceName}」总题数不匹配：平台报告 ${practice.questionCount}，实际获取 ${rawAll.size}")
+                error("练习「${practice.practiceName}」总题数不匹配：平台报告 $expectedTotal，实际获取 ${rawAll.size}")
             }
         }
 
@@ -204,7 +245,17 @@ class CctrApiClient {
             )
         )
 
-        return rawAll.map { raw -> parseQuestion(raw, practice, chapterMap, typeMap) }
+        if (rawAll.isEmpty()) return@coroutineScope emptyList()
+        val workers = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
+        if (rawAll.size < 16) {
+            return@coroutineScope rawAll.map { raw -> parseQuestion(raw, practice, chapterMap, typeMap) }
+        }
+        val chunkSize = (rawAll.size + workers - 1) / workers
+        rawAll.chunked(chunkSize).map { chunk ->
+            async(Dispatchers.Default) {
+                chunk.map { raw -> parseQuestion(raw, practice, chapterMap, typeMap) }
+            }
+        }.awaitAll().flatten()
     }
 
     private fun fetchPage(
@@ -324,16 +375,28 @@ class CctrApiClient {
             .header("User-Agent", "Mozilla/5.0")
             .post(body)
             .build()
-        http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) error("平台请求失败（HTTP ${resp.code}）")
-            val text = resp.body?.string().orEmpty()
-            val json = JSONObject(text)
-            if (json.optInt("code", -1) != 200) {
-                val err = json.optJSONObject("datas")?.optString("error").orEmpty()
-                error(err.ifBlank { "接口返回错误 code=${json.optInt("code")}" })
+        val backoffsMs = longArrayOf(150L, 350L)
+        var lastIoError: IOException? = null
+        for (attempt in 0..2) {
+            try {
+                http.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) error("平台请求失败（HTTP ${resp.code}）")
+                    val text = resp.body?.string().orEmpty()
+                    val json = JSONObject(text)
+                    if (json.optInt("code", -1) != 200) {
+                        val err = json.optJSONObject("datas")?.optString("error").orEmpty()
+                        error(err.ifBlank { "接口返回错误 code=${json.optInt("code")}" })
+                    }
+                    return json
+                }
+            } catch (e: IOException) {
+                lastIoError = e
+                if (attempt < backoffsMs.size) {
+                    Thread.sleep(backoffsMs[attempt])
+                }
             }
-            return json
         }
+        throw lastIoError ?: IOException("平台请求失败")
     }
 
     private fun rsaEncrypt(plainText: String): String {

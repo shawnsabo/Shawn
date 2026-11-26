@@ -14,9 +14,25 @@ from typing import Callable, Optional
 
 from .http_utils import make_http_client
 
+def _resolve_default_export_dir() -> Path:
+    import sys
+
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            buf = ctypes.create_unicode_buffer(260)
+            # CSIDL_PERSONAL = 5：兼容 Windows OneDrive 文档重定向或自定义“文档”目录
+            if ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0 and buf.value:
+                return Path(buf.value) / "CCTRExport"
+        except Exception:
+            pass
+    return Path.home() / "Documents" / "CCTRExport"
+
+
 SETTINGS_FILE = Path.home() / ".cctr_export" / "settings.json"
 RUNTIMES_DIR = Path.home() / ".cctr_export" / "runtimes"
-DEFAULT_EXPORT_DIR = Path.home() / "Documents" / "CCTRExport"
+DEFAULT_EXPORT_DIR = _resolve_default_export_dir()
 
 KERNEL_LABELS: list[tuple[str, str]] = [
     ("auto", "自动优选（自动检测本地 / 内置内核）"),
@@ -74,9 +90,17 @@ def set_preferred_kernel(kind: str) -> str:
 
 def get_export_dir() -> Path:
     raw = str(load_settings().get("export_dir") or "").strip()
-    p = Path(raw).expanduser() if raw else DEFAULT_EXPORT_DIR
-    p.mkdir(parents=True, exist_ok=True)
-    return p
+    candidates = [Path(raw).expanduser()] if raw else []
+    candidates.extend([DEFAULT_EXPORT_DIR, Path.home() / "Documents" / "CCTRExport", Path.home() / "CCTRExport"])
+    for p in candidates:
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except OSError:
+            continue
+    fallback = Path.home() / ".cctr_export" / "exports"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
 
 
 def set_export_dir(path: str | Path) -> Path:

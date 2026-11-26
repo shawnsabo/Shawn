@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import base64
+import dataclasses
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -12,9 +14,11 @@ import threading
 import time
 import zipfile
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable, Optional
 
+from .http_utils import ResilientHttpSession, sniff_image_mime
 from .integrity import (
     VERIFY_AND_SLICE_JS,
     build_export_document_html,
@@ -23,7 +27,130 @@ from .integrity import (
     validate_questions,
 )
 from .kernels import detect_kernel, get_preferred_kernel, resolve_render_backend
-from .models import Question
+from .models import Option, Question
+
+_ALLOWED_REMOTE_HOSTS = (
+    r"cctrcloud\.net|cctrcloud\.com|aliyuncs\.com|alicdn\.com|tbcdn\.cn|"
+    r"chaoxing\.com|xuexitong\.com|ddfv2\.com|"
+    r"yuketang\.cn|xuetangx\.com|rainclassroom\.com|myqcloud\.com|qcloud\.com|"
+    r"icourse163\.org|126\.net|zhihuishu\.com|icve\.com\.cn|ulearning\.cn|"
+    r"ketangpai\.com|pintia\.cn|educoder\.net|bcebos\.com|myhuaweicloud\.com|"
+    r"huaweicloud\.com|ksyun\.com|volces\.com|qiniucdn\.com|clouddn\.com|"
+    r"ufileos\.com|edu\.cn"
+)
+_REMOTE_IMG_ATTR_RE = re.compile(
+    rf'(<img\b[^>]*?\bsrc\s*=\s*["\'])((?:https?:)?//(?:[a-z0-9-]+\.)*(?:{_ALLOWED_REMOTE_HOSTS})(?::(?:80|443))?/[^"\']+)(["\'])',
+    re.I,
+)
+
+
+def _norm_img_url(url: str) -> str:
+    import html as _html
+
+    u = _html.unescape(url.strip())
+    if u.startswith("//"):
+        return "https:" + u
+    if u.lower().startswith("http://"):
+        return "https://" + u[len("http://"):]
+    return u
+
+
+def prefetch_and_inline_images(questions: list[Question]) -> list[Question]:
+    """直连并发预拉取允许域的远程图片并转为 data URI，避免无头浏览器受代理抖动影响且避免重复下载。"""
+    raw_urls: list[str] = []
+    seen_raw: set[str] = set()
+    for q in questions:
+        fields = [q.subject_html, q.answer, q.analysis_html] + [o.html for o in q.options]
+        for fld in fields:
+            if not fld or "<img" not in fld.lower():
+                continue
+            for m in _REMOTE_IMG_ATTR_RE.finditer(fld):
+                u = m.group(2).strip()
+                if u not in seen_raw:
+                    seen_raw.add(u)
+                    raw_urls.append(u)
+
+    if not raw_urls:
+        return questions
+
+    fetch_urls = list(dict.fromkeys(_norm_img_url(u) for u in raw_urls))
+    tls = threading.local()
+    sessions: list[ResilientHttpSession] = []
+    sessions_lock = threading.Lock()
+
+    def _get_session() -> ResilientHttpSession:
+        sess = getattr(tls, "sess", None)
+        if sess is None:
+            sess = ResilientHttpSession(timeout=20.0, prefer_direct=True)
+            tls.sess = sess
+            with sessions_lock:
+                sessions.append(sess)
+        return sess
+
+    def _fetch_one(fetch_url: str) -> tuple[str, Optional[str]]:
+        try:
+            resp = _get_session().get(fetch_url, timeout=20.0, retries=2)
+            if resp.status_code != 200 or not resp.content:
+                return fetch_url, None
+            mime = sniff_image_mime(resp.content)
+            if not mime and resp.content.lstrip()[:64].lower().startswith((b"<svg", b"<?xml")):
+                mime = "image/svg+xml"
+            if not mime:
+                return fetch_url, None
+            b64 = base64.b64encode(resp.content).decode("ascii")
+            return fetch_url, f"data:{mime};base64,{b64}"
+        except Exception:
+            return fetch_url, None
+
+    fetch_map: dict[str, str] = {}
+    try:
+        with ThreadPoolExecutor(max_workers=min(8, len(fetch_urls))) as pool:
+            for fu, data_uri in pool.map(_fetch_one, fetch_urls):
+                if data_uri:
+                    fetch_map[fu] = data_uri
+    finally:
+        for s in sessions:
+            try:
+                s.close()
+            except Exception:
+                pass
+
+    if not fetch_map:
+        return questions
+
+    raw_map: dict[str, str] = {}
+    for ru in raw_urls:
+        nu = _norm_img_url(ru)
+        if nu in fetch_map:
+            raw_map[ru] = fetch_map[nu]
+
+    if not raw_map:
+        return questions
+
+    def _inline_field(text: str) -> str:
+        if not text or "<img" not in text.lower():
+            return text
+        return _REMOTE_IMG_ATTR_RE.sub(
+            lambda m: f"{m.group(1)}{raw_map.get(m.group(2).strip(), m.group(2))}{m.group(3)}",
+            text,
+        )
+
+    out: list[Question] = []
+    for q in questions:
+        new_opts = [
+            Option(is_true=o.is_true, html=_inline_field(o.html))
+            for o in q.options
+        ]
+        out.append(
+            dataclasses.replace(
+                q,
+                subject_html=_inline_field(q.subject_html),
+                answer=_inline_field(q.answer),
+                analysis_html=_inline_field(q.analysis_html),
+                options=new_opts,
+            )
+        )
+    return out
 
 
 def _find_chromium_binary(preferred_kind: Optional[str] = None) -> Optional[str]:
@@ -353,7 +480,7 @@ def export_questions_to_pdf(
     smart_pagination: bool = True,
 ) -> Path:
     """导出合并的单个 A4 PDF（通过内容完整性、图片解码、长图切片与页宽校验）。"""
-    items = validate_questions(questions)
+    items = prefetch_and_inline_images(validate_questions(questions))
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     if progress_callback:
@@ -402,7 +529,7 @@ def export_questions_to_archive_zip(
     smart_pagination: bool = True,
 ) -> Path:
     """按 学科/章节/题型 分类导出多个 PDF 并打包 ZIP，附带含 SHA-256 的 导出清单.json。"""
-    items = validate_questions(questions)
+    items = prefetch_and_inline_images(validate_questions(questions))
     groups: dict[tuple[str, str, str], list[Question]] = defaultdict(list)
     for q in items:
         key = (q.subject_name or "未分类学科", q.chapter_name or "未分类章节", q.question_type or "未分类题型")
@@ -478,7 +605,7 @@ def export_questions_to_images(
     import httpx
     import websocket
 
-    items = validate_questions(questions)
+    items = prefetch_and_inline_images(validate_questions(questions))
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 

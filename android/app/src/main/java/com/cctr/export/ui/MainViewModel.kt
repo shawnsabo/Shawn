@@ -1,8 +1,11 @@
 package com.cctr.export.ui
 
 import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cctr.export.core.AnswerVariant
@@ -11,28 +14,79 @@ import com.cctr.export.core.CctrApiClient
 import com.cctr.export.core.ChapterItem
 import com.cctr.export.core.ExportFormat
 import com.cctr.export.core.ExportedFileEntry
+import com.cctr.export.core.FormatConverter
 import com.cctr.export.core.PdfAndZipExporter
 import com.cctr.export.core.PracticeItem
 import com.cctr.export.core.QuestionItem
 import com.cctr.export.core.QuestionTypeItem
+import com.cctr.export.core.WebPlatformExtractor
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+
+enum class SourceTab(val label: String) {
+    CCTR("融智云考"),
+    CHAOXING("学习通"),
+    YUKETANG("雨课堂"),
+    LOCAL_FILE("导入文件")
+}
+
+data class SavedAccount(
+    val schoolCode: String,
+    val username: String
+)
+
+data class LogEntry(
+    val id: Long,
+    val text: String
+)
+
+data class SavedFileUi(
+    val file: File,
+    val name: String,
+    val ext: String,
+    val sizeKb: Long,
+    val path: String
+)
 
 data class MainUiState(
     val activeTab: Int = 0, // 0=导出工作台, 1=任务进度, 2=本地文件
-    val wizardStep: Int = 1, // 1=登录, 2=选练习, 3=导出设置
+    val wizardStep: Int = 1, // 1=接入源, 2=选练习, 3=导出设置
+    val sourceTab: SourceTab = SourceTab.CCTR,
+    val yuketangPresetKey: String = "yuketang",
+    val browserVisible: Boolean = false,
+    val browserInitialUrl: String = "https://i.chaoxing.com",
+    val browserNonce: Int = 0,
+    val browserStatus: String = "请登录后进入具体作业/测验页再提取",
+    val captureBusy: Boolean = false,
+    val capturedCount: Int = 0,
+    val importBusy: Boolean = false,
+    val externalError: String? = null,
+    val ocrReady: Boolean = false,
     val schoolCode: String = "",
     val username: String = "",
     val password: String = "",
+    val savedAccounts: List<SavedAccount> = emptyList(),
     val captchaCode: String = "",
     val captchaBitmap: Bitmap? = null,
     val captchaLoading: Boolean = false,
@@ -42,6 +96,7 @@ data class MainUiState(
     val loginBusy: Boolean = false,
     val loginError: String? = null,
     val practices: List<PracticeItem> = emptyList(),
+    val practiceSearch: String = "",
     val selectedPracticeIds: Set<Int> = emptySet(),
     val chapters: List<ChapterItem> = emptyList(),
     val questionTypes: List<QuestionTypeItem> = emptyList(),
@@ -52,19 +107,32 @@ data class MainUiState(
     val answerVariant: AnswerVariant = AnswerVariant.WITH_ANSWERS_RED,
     val exportFormat: ExportFormat = ExportFormat.MERGED_PDF,
     val exporting: Boolean = false,
+    val exportProgress: Float? = null,
     val exportProgressText: String = "",
     val exportResult: ExportedFileEntry? = null,
     val exportError: String? = null,
-    val logs: List<String> = emptyList(),
-    val savedFiles: List<File> = emptyList()
+    val logs: List<LogEntry> = emptyList(),
+    val savedFiles: List<SavedFileUi> = emptyList()
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val api = CctrApiClient()
     private val exporter = PdfAndZipExporter(application)
-    private val ocr: CaptchaOcr? = runCatching { CaptchaOcr(application) }.getOrNull()
+    private val prefs = application.getSharedPreferences("cctr_atelier_prefs", Context.MODE_PRIVATE)
 
-    private val _state = MutableStateFlow(MainUiState())
+    private val localBanks = ConcurrentHashMap<Int, List<QuestionItem>>()
+    private val nextLocalBankId = AtomicInteger(-1)
+
+    private val ocrMutex = Mutex()
+    @Volatile
+    private var ocrInstance: CaptchaOcr? = null
+    @Volatile
+    private var ocrInitAttempted = false
+
+    private val nextLogId = AtomicLong(1L)
+    private var lastProgressPushMs = 0L
+
+    private val _state = MutableStateFlow(MainUiState(savedAccounts = loadSavedAccounts()))
     val state: StateFlow<MainUiState> = _state.asStateFlow()
 
     init {
@@ -72,14 +140,127 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadCaptcha()
     }
 
+    private suspend fun getOrInitOcr(): CaptchaOcr? {
+        ocrInstance?.let { return it }
+        if (ocrInitAttempted) return null
+        return ocrMutex.withLock {
+            ocrInstance?.let { return@withLock it }
+            if (ocrInitAttempted) return@withLock null
+            ocrInitAttempted = true
+            val created = withContext(Dispatchers.IO) {
+                runCatching { CaptchaOcr(getApplication()) }.getOrNull()
+            }
+            ocrInstance = created
+            if (created != null) {
+                _state.update { it.copy(ocrReady = true) }
+            }
+            created
+        }
+    }
+
+    private fun loadSavedAccounts(): List<SavedAccount> {
+        val raw = prefs.getString("saved_accounts", "[]") ?: "[]"
+        val arr = runCatching { JSONArray(raw) }.getOrNull() ?: return emptyList()
+        val out = mutableListOf<SavedAccount>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val sc = obj.optString("school").trim()
+            val un = obj.optString("username").trim()
+            if (sc.isNotEmpty() && un.isNotEmpty()) {
+                out += SavedAccount(sc, un)
+            }
+        }
+        return out.take(6)
+    }
+
+    private fun persistSavedAccounts(list: List<SavedAccount>) {
+        val arr = JSONArray()
+        list.take(6).forEach { acc ->
+            arr.put(JSONObject().apply {
+                put("school", acc.schoolCode)
+                put("username", acc.username)
+            })
+        }
+        prefs.edit().putString("saved_accounts", arr.toString()).apply()
+    }
+
+    fun applySavedAccount(acc: SavedAccount) {
+        _state.update { it.copy(schoolCode = acc.schoolCode, username = acc.username, loginError = null) }
+    }
+
+    fun removeSavedAccount(acc: SavedAccount) {
+        val updated = _state.value.savedAccounts.filterNot { it.schoolCode == acc.schoolCode && it.username == acc.username }
+        persistSavedAccounts(updated)
+        _state.update { it.copy(savedAccounts = updated) }
+    }
+
+    private fun rememberAccount(school: String, username: String) {
+        val s = school.trim()
+        val u = username.trim()
+        if (s.isEmpty() || u.isEmpty()) return
+        val updated = (listOf(SavedAccount(s, u)) + _state.value.savedAccounts.filterNot {
+            it.schoolCode == s && it.username == u
+        }).take(6)
+        persistSavedAccounts(updated)
+        _state.update { it.copy(savedAccounts = updated) }
+    }
+
     private fun appendLog(msg: String) {
         val ts = SimpleDateFormat("HH:mm:ss", Locale.CHINA).format(Date())
-        _state.update { s -> s.copy(logs = (s.logs + "[$ts] $msg").takeLast(120)) }
+        val entry = LogEntry(id = nextLogId.getAndIncrement(), text = "[$ts] $msg")
+        _state.update { s -> s.copy(logs = (s.logs + entry).takeLast(120)) }
+    }
+
+    private fun updateExportProgressThrottled(text: String, fraction: Float?, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastProgressPushMs < 80L) return
+        lastProgressPushMs = now
+        _state.update { s ->
+            s.copy(
+                exportProgressText = text,
+                exportProgress = fraction?.coerceIn(0f, 1f) ?: s.exportProgress
+            )
+        }
     }
 
     fun setTab(tab: Int) {
         if (tab == 2) refreshSavedFiles()
         _state.update { it.copy(activeTab = tab) }
+    }
+
+    fun setSourceTab(tab: SourceTab) {
+        _state.update { it.copy(sourceTab = tab, externalError = null, loginError = null) }
+    }
+
+    fun setYuketangPreset(key: String) {
+        _state.update { it.copy(yuketangPresetKey = key) }
+    }
+
+    fun openPlatformBrowser(presetKey: String) {
+        val preset = WebPlatformExtractor.PLATFORM_PRESETS.firstOrNull { it.key == presetKey }
+            ?: WebPlatformExtractor.PLATFORM_PRESETS.first()
+        _state.update {
+            it.copy(
+                browserVisible = true,
+                browserInitialUrl = preset.url,
+                browserNonce = it.browserNonce + 1,
+                browserStatus = "正在打开 ${preset.label}，登录后进入作业/测验页提取",
+                externalError = null
+            )
+        }
+    }
+
+    fun finishBrowserCaptureAndProceed() {
+        _state.update { s ->
+            s.copy(
+                browserVisible = false,
+                wizardStep = if (s.practices.isNotEmpty()) 2 else s.wizardStep
+            )
+        }
+    }
+
+    fun closePlatformBrowser() {
+        _state.update { it.copy(browserVisible = false) }
     }
 
     fun setWizardStep(step: Int) {
@@ -89,21 +270,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun signOut() {
+        localBanks.clear()
         _state.update {
             it.copy(
                 wizardStep = 1,
                 password = "",
                 captchaCode = "",
                 practices = emptyList(),
+                practiceSearch = "",
                 selectedPracticeIds = emptySet(),
                 chapters = emptyList(),
                 questionTypes = emptyList(),
                 selectedChapterIds = emptySet(),
                 selectedTypeIds = emptySet(),
+                capturedCount = 0,
                 exportResult = null,
                 exportError = null,
+                exportProgress = null,
                 exportProgressText = "",
-                loginError = null
+                loginError = null,
+                externalError = null
             )
         }
         loadCaptcha()
@@ -115,6 +301,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateUsername(v: String) = _state.update { it.copy(username = v) }
     fun updatePassword(v: String) = _state.update { it.copy(password = v) }
     fun updateCaptchaCode(v: String) = _state.update { it.copy(captchaCode = v) }
+    fun updatePracticeSearch(q: String) = _state.update { it.copy(practiceSearch = q) }
     fun setAnswerVariant(v: AnswerVariant) = _state.update { it.copy(answerVariant = v) }
     fun setExportFormat(f: ExportFormat) = _state.update { it.copy(exportFormat = f) }
     fun setPracticedOnly(only: Boolean) = _state.update { it.copy(practicedOnly = only) }
@@ -133,6 +320,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val (bmp, recognized) = withContext(Dispatchers.IO) {
+                    val ocr = getOrInitOcr()
                     var bestBytes = ByteArray(0)
                     var bestCode = ""
                     val tries = if (ocr != null) 3 else 1
@@ -190,6 +378,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val unique = list.distinctBy { "${it.lessonName}|${it.practiceName}" }
                     .sortedWith(compareBy({ it.lessonName }, { it.practiceName }))
+                rememberAccount(s.schoolCode, s.username)
                 _state.update {
                     it.copy(
                         loginBusy = false,
@@ -203,6 +392,113 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update { it.copy(loginBusy = false, loginError = e.message ?: "登录失败", captchaCode = "") }
                 appendLog("✗ 登录失败：${e.message}")
                 loadCaptcha()
+            }
+        }
+    }
+
+    fun ingestCapturedWebPayload(rawJson: String) {
+        if (_state.value.captureBusy) return
+        _state.update { it.copy(captureBusy = true, browserStatus = "正在提取并解密混淆汉字…") }
+        viewModelScope.launch {
+            try {
+                val (title, questions) = withContext(Dispatchers.Default) {
+                    val ocr = getOrInitOcr()
+                    WebPlatformExtractor.parseCapturedPayload(rawJson) { png ->
+                        ocr?.recognizeSingleGlyph(png).orEmpty()
+                    }
+                }
+                val bankId = nextLocalBankId.getAndDecrement()
+                localBanks[bankId] = questions
+                val sourceName = questions.firstOrNull()?.subjectName ?: "网页捕获"
+                val newPractice = PracticeItem(
+                    id = bankId,
+                    courseId = "__local_bank__",
+                    practiseId = bankId.toString(),
+                    teacherId = sourceName,
+                    lessonName = sourceName,
+                    practiceName = title,
+                    teacherName = sourceName,
+                    finishTime = "",
+                    questionCount = questions.size
+                )
+                _state.update { s ->
+                    s.copy(
+                        captureBusy = false,
+                        capturedCount = s.capturedCount + 1,
+                        practices = s.practices + newPractice,
+                        selectedPracticeIds = s.selectedPracticeIds + bankId,
+                        browserStatus = "✓ 已加入「$title」(${questions.size} 题)，可继续抓取或点右侧完成"
+                    )
+                }
+                appendLog("✓ 网页捕获成功：「$title」（${questions.size} 题 · $sourceName）")
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        captureBusy = false,
+                        browserStatus = "✗ ${e.message ?: "未检测到题目节点"}"
+                    )
+                }
+                appendLog("✗ 网页提取失败：${e.message}")
+            }
+        }
+    }
+
+    private fun queryUriDisplayName(context: Context, uri: Uri): String {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0) return c.getString(idx).orEmpty()
+            }
+        }
+        return uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { "导入题库.txt" } ?: "导入题库.txt"
+    }
+
+    fun importUriFiles(context: Context, uris: List<Uri>) {
+        if (uris.isEmpty() || _state.value.importBusy) return
+        _state.update { it.copy(importBusy = true, externalError = null) }
+        viewModelScope.launch {
+            try {
+                val added = withContext(Dispatchers.IO) {
+                    val out = mutableListOf<PracticeItem>()
+                    for (uri in uris) {
+                        val name = queryUriDisplayName(context, uri)
+                        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: error("无法读取文件：$name")
+                        val (title, qs) = FormatConverter.importFromBytes(name, bytes)
+                        val bankId = nextLocalBankId.getAndDecrement()
+                        localBanks[bankId] = qs
+                        val extLabel = name.substringAfterLast('.', "FILE").uppercase()
+                        out += PracticeItem(
+                            id = bankId,
+                            courseId = "__local_bank__",
+                            practiseId = bankId.toString(),
+                            teacherId = extLabel,
+                            lessonName = "本地导入 ($extLabel)",
+                            practiceName = title,
+                            teacherName = extLabel,
+                            finishTime = "",
+                            questionCount = qs.size
+                        )
+                        appendLog("✓ 导入题库：「$name」共 ${qs.size} 题")
+                    }
+                    out
+                }
+                _state.update { s ->
+                    s.copy(
+                        importBusy = false,
+                        practices = s.practices + added,
+                        selectedPracticeIds = s.selectedPracticeIds + added.map { it.id },
+                        wizardStep = 2
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        importBusy = false,
+                        externalError = e.message ?: "导入失败"
+                    )
+                }
+                appendLog("✗ 导入失败：${e.message}")
             }
         }
     }
@@ -231,9 +527,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         viewModelScope.launch {
-            val (chapters, qtypes) = withContext(Dispatchers.IO) {
-                runCatching { api.getChapterAndQuestionTypes(selected.first()) }
-                    .getOrElse { emptyList<ChapterItem>() to emptyList<QuestionTypeItem>() }
+            val first = selected.first()
+            val (chapters, qtypes) = if (first.courseId == "__local_bank__") {
+                val qs = selected.flatMap { localBanks[it.id].orEmpty() }
+                val ch = qs.map { it.chapterName }.distinct().map { ChapterItem(it, "__local_bank__", it) }
+                val qt = qs.map { it.questionType }.distinct().map { QuestionTypeItem(it, it, it) }
+                ch to qt
+            } else {
+                withContext(Dispatchers.IO) {
+                    runCatching { api.getChapterAndQuestionTypes(first) }
+                        .getOrElse { emptyList<ChapterItem>() to emptyList<QuestionTypeItem>() }
+                }
             }
             _state.update {
                 it.copy(
@@ -266,49 +570,75 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startExport() {
         val s = _state.value
+        if (s.exporting) return
         val selected = s.practices.filter { it.id in s.selectedPracticeIds }
         if (selected.isEmpty()) return
 
         val filterChapters = s.chapters.filter { it.id in s.selectedChapterIds }
         val filterTypes = s.questionTypes.filter { (it.questionTypeId.ifBlank { it.id }) in s.selectedTypeIds }
 
+        lastProgressPushMs = 0L
         _state.update {
             it.copy(
                 exporting = true,
                 exportError = null,
                 exportResult = null,
-                exportProgressText = "正在分页读取题目与核对题数…"
+                exportProgress = 0.02f,
+                exportProgressText = "正在读取与整合 ${selected.size} 项题库…"
             )
         }
-        appendLog("开始导出 ${selected.size} 个练习（已启用题数核对与图像/页宽校验）")
+        appendLog("开始导出 ${selected.size} 个练习（格式：${s.exportFormat.label}）")
 
         viewModelScope.launch {
             try {
                 val allQuestions = withContext(Dispatchers.IO) {
-                    val out = mutableListOf<QuestionItem>()
-                    for (p in selected) {
-                        appendLog("正在拉取：「${p.practiceName}」")
-                        val qs = api.queryQuestions(p, filterChapters, filterTypes, s.practicedOnly)
-                        appendLog("✓ 「${p.practiceName}」核对通过：${qs.size} 题")
-                        out.addAll(qs)
+                    val sem = Semaphore(4)
+                    val done = AtomicInteger(0)
+                    val totalPractices = selected.size.coerceAtLeast(1)
+                    val chNames = filterChapters.map { it.name }.toSet()
+                    val qtNames = filterTypes.map { it.name }.toSet()
+                    coroutineScope {
+                        selected.map { p ->
+                            async(Dispatchers.IO) {
+                                sem.withPermit {
+                                    val qs = if (p.courseId == "__local_bank__") {
+                                        var raw = localBanks[p.id].orEmpty()
+                                        if (chNames.isNotEmpty()) raw = raw.filter { it.chapterName in chNames }
+                                        if (qtNames.isNotEmpty()) raw = raw.filter { it.questionType in qtNames }
+                                        raw
+                                    } else {
+                                        api.queryQuestions(p, filterChapters, filterTypes, s.practicedOnly)
+                                    }
+                                    val finishedCount = done.incrementAndGet()
+                                    appendLog("✓ 「${p.practiceName}」核对通过：${qs.size} 题")
+                                    updateExportProgressThrottled(
+                                        "已整合 $finishedCount/$totalPractices 项题库…",
+                                        0.02f + 0.25f * finishedCount / totalPractices,
+                                        force = finishedCount == totalPractices
+                                    )
+                                    qs
+                                }
+                            }
+                        }.awaitAll().flatten()
                     }
-                    out
                 }
-                val baseName = if (selected.size == 1) selected.first().practiceName else "融智云考批量导出_${selected.size}份"
+                val baseName = if (selected.size == 1) selected.first().practiceName else "多平台题库导出_${selected.size}份"
                 val result = when (s.exportFormat) {
-                    ExportFormat.MERGED_PDF -> exporter.exportMergedPdf(allQuestions, s.answerVariant, baseName, s.smartPagination) { msg ->
-                        _state.update { it.copy(exportProgressText = msg) }
-                        appendLog(msg)
+                    ExportFormat.MERGED_PDF -> exporter.exportMergedPdf(allQuestions, s.answerVariant, baseName, s.smartPagination) { msg, frac ->
+                        updateExportProgressThrottled(msg, frac, force = frac != null && frac >= 0.94f)
                     }
-                    ExportFormat.CATEGORIZED_ZIP -> exporter.exportCategorizedZip(allQuestions, s.answerVariant, baseName, s.smartPagination) { msg ->
-                        _state.update { it.copy(exportProgressText = msg) }
-                        appendLog(msg)
+                    ExportFormat.CATEGORIZED_ZIP -> exporter.exportCategorizedZip(allQuestions, s.answerVariant, baseName, s.smartPagination) { msg, frac ->
+                        updateExportProgressThrottled(msg, frac, force = frac != null && frac >= 0.90f)
+                    }
+                    else -> exporter.exportFormattedFile(allQuestions, s.exportFormat, s.answerVariant, baseName) { msg, frac ->
+                        updateExportProgressThrottled(msg, frac, force = frac != null && frac >= 0.90f)
                     }
                 }
                 refreshSavedFiles()
                 _state.update {
                     it.copy(
                         exporting = false,
+                        exportProgress = 1f,
                         exportProgressText = "导出完成：${result.name}（共 ${result.questionCount} 题）",
                         exportResult = result
                     )
@@ -318,6 +648,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update {
                     it.copy(
                         exporting = false,
+                        exportProgress = null,
                         exportError = e.message ?: "导出失败",
                         exportProgressText = "导出失败：${e.message}"
                     )
@@ -328,11 +659,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshSavedFiles() {
-        _state.update { it.copy(savedFiles = exporter.listSavedExports()) }
+        viewModelScope.launch {
+            val items = withContext(Dispatchers.IO) {
+                exporter.listSavedExports().map { file ->
+                    SavedFileUi(
+                        file = file,
+                        name = file.name,
+                        ext = file.extension.uppercase().ifBlank { "FILE" },
+                        sizeKb = file.length() / 1024L,
+                        path = file.absolutePath
+                    )
+                }
+            }
+            _state.update { it.copy(savedFiles = items) }
+        }
     }
 
     override fun onCleared() {
-        ocr?.close()
+        ocrInstance?.close()
         super.onCleared()
     }
 }

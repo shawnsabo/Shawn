@@ -1,5 +1,7 @@
 PySide6>=6.8
-httpx>=0.28
+httpx[socks]>=0.28
+socksio>=1.0
+certifi>=2024.0
 pycryptodome>=3.21
 Pillow>=11.0
 ddddocr>=1.4

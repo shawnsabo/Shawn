@@ -14,18 +14,97 @@ from .models import Question
 _BASE64_RE = re.compile(r"^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$")
 _CHOICE_RE = re.compile(r"选择|单选|多选")
 _ZERO_WIDTH_RE = re.compile(r"[\s\u200b\u200c\u200d\ufeff]+")
-_IMG_SRC_DATA_RE = re.compile(r"^data:image/(?:png|jpeg|gif|webp|svg\+xml)(?:;[^,]*)?,", re.I)
+_BLANK_ENTITY_NAMES = frozenset({"nbsp", "ensp", "emsp", "thinsp", "zwnj", "zwj"})
+_BLANK_CODEPOINTS = frozenset({0x00A0, 0x2002, 0x2003, 0x2009, 0x200B, 0x200C, 0x200D, 0xFEFF})
+_IMG_SRC_DATA_RE = re.compile(
+    r"^data:image/(?:png|jpe?g|gif|webp|bmp|svg\+xml|x-icon|ico|tiff|avif|apng)(?:;[^,]*)?,",
+    re.I,
+)
+_ALLOWED_IMG_HOSTS = (
+    r"cctrcloud\.net|cctrcloud\.com|aliyuncs\.com|alicdn\.com|tbcdn\.cn|"
+    r"chaoxing\.com|xuexitong\.com|ddfv2\.com|"
+    r"yuketang\.cn|xuetangx\.com|rainclassroom\.com|myqcloud\.com|qcloud\.com|"
+    r"icourse163\.org|126\.net|zhihuishu\.com|icve\.com\.cn|ulearning\.cn|"
+    r"ketangpai\.com|pintia\.cn|educoder\.net|bcebos\.com|myhuaweicloud\.com|"
+    r"huaweicloud\.com|ksyun\.com|volces\.com|qiniucdn\.com|clouddn\.com|"
+    r"ufileos\.com|edu\.cn"
+)
 _IMG_SRC_HTTPS_RE = re.compile(
-    r"^https?://(?:[a-z0-9-]+\.)*(?:cctrcloud\.net|aliyuncs\.com)(?::(?:80|443))?/",
+    rf"^(?:https?:)?//(?:[a-z0-9-]+\.)*(?:{_ALLOWED_IMG_HOSTS})(?::(?:80|443))?(?:/|[?#]|$)",
     re.I,
 )
 
 _ALLOWED_TAGS = frozenset({
-    "p", "div", "span", "a", "br", "strong", "b", "em", "i", "u", "s",
-    "sup", "sub", "ol", "ul", "li", "table", "thead", "tbody", "tfoot",
-    "tr", "td", "th", "img", "blockquote", "pre",
+    "p", "div", "span", "a", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6",
+    "strong", "b", "em", "i", "u", "s", "sup", "sub", "code", "kbd", "samp",
+    "var", "mark", "del", "ins", "small", "big", "q", "cite", "dfn", "abbr",
+    "ol", "ul", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot",
+    "tr", "td", "th", "caption", "colgroup", "col", "img", "blockquote",
+    "pre", "section",
 })
-_VOID_TAGS = frozenset({"br", "img"})
+_MATHML_TAGS = frozenset({
+    "math", "mrow", "mi", "mo", "mn", "msup", "msub", "msubsup", "mfrac",
+    "msqrt", "mroot", "mtable", "mtr", "mtd", "mtext", "mspace", "mstyle",
+    "mover", "munder", "munderover", "semantics", "annotation", "mfenced",
+    "menclose", "mpadded", "mphantom", "merror", "mglyph", "mlabeledtr",
+    "mmultiscripts", "mprescripts", "none",
+})
+_SVG_TAGS = frozenset({
+    "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline",
+    "polygon", "text", "tspan", "defs", "lineargradient", "radialgradient",
+    "stop", "clippath", "mask", "marker", "symbol", "use", "pattern",
+    "title", "desc",
+})
+_VOID_TAGS = frozenset({
+    "br", "img", "hr", "col", "path", "rect", "circle", "ellipse",
+    "line", "polyline", "polygon", "stop", "use", "mspace", "mglyph",
+    "mprescripts", "none",
+})
+_FORBIDDEN_TAGS = frozenset({
+    "script", "iframe", "frame", "frameset", "object", "embed", "applet",
+    "link", "meta", "base", "foreignobject",
+})
+_ALIAS_TAGS = {
+    "strike": "s", "tt": "code", "listing": "pre", "xmp": "pre", "plaintext": "pre",
+    "tabody": "tbody", "tboday": "tbody", "tbdoy": "tbody", "tboyd": "tbody", "tobody": "tbody",
+    "tahead": "thead", "tehad": "thead", "tafoot": "tfoot", "tffot": "tfoot",
+    "big": "span", "acronym": "abbr", "dir": "ul", "menu": "ul", "nobr": "span",
+    "article": "div", "header": "div", "footer": "div", "main": "div", "nav": "div", "aside": "div",
+    "h7": "h6", "h8": "h6",
+    "label": "span", "fieldset": "div", "legend": "strong", "details": "div", "summary": "strong",
+    "address": "div", "time": "span", "data": "span", "output": "span", "progress": "span", "meter": "span",
+    "ruby": "span", "rt": "span", "rp": "span", "bdi": "span", "bdo": "span", "bgsound": "span",
+    "form": "div", "button": "span", "select": "span", "optgroup": "span", "textarea": "span", "datalist": "span",
+}
+_UNWRAP_TAGS = frozenset({
+    "font", "center", "wbr", "figure", "figcaption", "picture",
+    "html", "head", "body", "basefont", "marquee", "blink", "layer",
+    "ilayer", "spacer", "source", "track", "param", "map", "area",
+    "canvas", "o", "v", "w", "st1", "m",
+})
+_CODE_LITERAL_TAGS = frozenset({
+    "int", "long", "short", "char", "float", "double", "bool", "boolean",
+    "void", "byte", "string", "vector", "list", "map", "set", "pair",
+    "queue", "stack", "deque", "iostream", "cstdio", "cstdlib", "cstring",
+    "cmath", "algorithm", "fstream", "sstream", "iomanip", "t", "k", "v", "e", "r",
+})
+_NS_TAG_RE = re.compile(r"^[a-z0-9_-]+:[a-z0-9_.:-]+$")
+_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_MSO_COND_RE = re.compile(r"<!\[(?:if\b[^\]]*|endif)\]>?", re.I)
+_XML_PI_RE = re.compile(r"<\?xml\b[^>]*\?>", re.I)
+_XML_BLOCK_RE = re.compile(r"<xml\b[^>]*>.*?</xml>", re.I | re.S)
+_STYLE_BLOCK_RE = re.compile(r"<style\b[^>]*>.*?</style>", re.I | re.S)
+_TITLE_BLOCK_RE = re.compile(r"<title\b[^>]*>.*?</title>", re.I | re.S)
+_WORD_META_RE = re.compile(r"<meta\b[^>]*>", re.I)
+_WORD_LINK_RE = re.compile(
+    r"""<link\b[^>]*\brel\s*=\s*["']?(?:File-List|Edit-Time-Data|themeData|colorSchemeMapping|dataStore|Original-File)\b[^>]*>""",
+    re.I,
+)
+_GLUED_ATTR_RE = re.compile(
+    r"<(/?)(p|div|span|font|td|th|tr|table|tbody|thead|tfoot|img|a|li|ul|ol|strong|em)"
+    r"(style|align|class|src|href|width|height|color|size|face|colspan|rowspan)=",
+    re.I,
+)
 _ALLOWED_STYLE_RULES = {
     "font-weight": re.compile(r"^(?:normal|bold|[1-9]00)$"),
     "font-style": re.compile(r"^(?:normal|italic)$"),
@@ -44,10 +123,23 @@ VERIFY_AND_SLICE_JS = r"""
   }
   const images = Array.from(document.images || []);
   for (const image of images) {
-    try {
-      await image.decode();
-    } catch (e) {
-      return { ok: false, error: '图片或公式加载失败：' + (image.getAttribute('src') || '').slice(0, 80) };
+    let decoded = false;
+    const origSrc = image.getAttribute('src') || '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0 && /^https?:/i.test(origSrc)) {
+          await new Promise(r => setTimeout(r, 250));
+          image.removeAttribute('src');
+          image.setAttribute('src', origSrc);
+        }
+        await image.decode();
+        decoded = true;
+        break;
+      } catch (e) {
+      }
+    }
+    if (!decoded) {
+      return { ok: false, error: '图片或公式加载失败：' + origSrc.slice(0, 80) };
     }
     if (!image.naturalWidth || !image.naturalHeight) {
       return { ok: false, error: '图片或公式内容为空' };
@@ -173,7 +265,7 @@ def decode_rich_content(value: object) -> str:
         return ""
     if not isinstance(value, str):
         raise ValueError("平台返回的题目富文本格式不支持（非字符串）")
-    compact = value.strip()
+    compact = re.sub(r"\s+", "", value)
     if not compact:
         return ""
     if not _BASE64_RE.match(compact):
@@ -205,17 +297,102 @@ def _sanitize_style(raw_style: str) -> str:
     return ";".join(kept)
 
 
+def _preclean_office_html(raw_html: str) -> str:
+    """剥离 MS Word/WPS 粘贴残留的条件注释、XML 元数据与内联样式块，修复常见粘连标签并保留正文内容。"""
+    cleaned = _COMMENT_RE.sub("", raw_html)
+    cleaned = _MSO_COND_RE.sub("", cleaned)
+    cleaned = _XML_PI_RE.sub("", cleaned)
+    cleaned = _XML_BLOCK_RE.sub("", cleaned)
+    cleaned = _STYLE_BLOCK_RE.sub("", cleaned)
+    cleaned = _TITLE_BLOCK_RE.sub("", cleaned)
+    cleaned = _WORD_META_RE.sub("", cleaned)
+    cleaned = _WORD_LINK_RE.sub("", cleaned)
+    cleaned = _GLUED_ATTR_RE.sub(lambda m: f"<{m.group(1)}{m.group(2)} {m.group(3)}=", cleaned)
+    return cleaned
+
+
+_SAFE_MATHML_ATTRS = frozenset({
+    "xmlns", "display", "mathvariant", "mathcolor", "mathbackground", "mathsize",
+    "stretchy", "symmetric", "maxsize", "minsize", "fence", "separator",
+    "lspace", "rspace", "columnalign", "rowalign", "columnlines", "rowlines",
+    "frame", "linethickness", "columnspan", "rowspan", "encoding",
+})
+_SAFE_SVG_ATTRS = frozenset({
+    "xmlns", "viewbox", "width", "height", "fill", "stroke", "stroke-width",
+    "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "stroke-opacity",
+    "fill-opacity", "opacity", "transform", "d", "cx", "cy", "r", "rx", "ry",
+    "x", "y", "x1", "y1", "x2", "y2", "dx", "dy", "points", "offset",
+    "stop-color", "stop-opacity", "text-anchor", "dominant-baseline",
+    "font-size", "font-family", "font-weight", "font-style", "preserveaspectratio",
+    "id", "class",
+})
+
+
 class _StrictHtmlSanitizer(HTMLParser):
-    def __init__(self):
+    def __init__(self, source_lower: str = ""):
         super().__init__(convert_charrefs=False)
         self.out: list[str] = []
         self.has_visible_content = False
+        self._source_lower = source_lower
+        self._escaped_unknown_stack: list[str] = []
+
+    def _emit_literal(self, text: str) -> None:
+        if _ZERO_WIDTH_RE.sub("", text):
+            self.has_visible_content = True
+        self.out.append(html_lib.escape(text, quote=False))
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
-        t = tag.lower()
-        if t not in _ALLOWED_TAGS:
-            raise ValueError(f"暂不支持富文本标签：<{t}>")
+        raw_t = tag.lower()
+        if raw_t in _FORBIDDEN_TAGS:
+            raise ValueError(f"暂不支持富文本标签：<{raw_t}>")
+        if raw_t in _UNWRAP_TAGS or _NS_TAG_RE.match(raw_t):
+            return
+        # 若 <tag ...> 含非 ASCII 裸属性（如数学公式 "a<b 且 b>0" 被误解析为 <b 且 b>），按字面比较表达式转义保留
+        if attrs and any((not k.isascii() and v is None) for k, v in attrs):
+            self._emit_literal(self.get_starttag_text() or f"<{tag}>")
+            return
+
         attr_map = {k.lower(): (v or "") for k, v in attrs}
+        if raw_t == "input":
+            itype = attr_map.get("type", "").strip().lower()
+            if itype == "hidden":
+                return
+            if itype == "checkbox":
+                label = "☑" if "checked" in attr_map else "□"
+            elif itype == "radio":
+                label = "◉" if "checked" in attr_map else "○"
+            else:
+                val = (attr_map.get("value") or attr_map.get("placeholder") or "______").strip() or "______"
+                label = f"[{val}]"
+            self.has_visible_content = True
+            self.out.append(f'<span class="inline-ctrl">{html_lib.escape(label, quote=False)}</span>')
+            return
+        if raw_t == "option":
+            self.out.append('<span class="inline-ctrl">[')
+            return
+        if raw_t in ("audio", "video"):
+            tag_label = "音频" if raw_t == "audio" else "视频"
+            self.has_visible_content = True
+            self.out.append(f'<span class="inline-ctrl">[{tag_label}]')
+            return
+
+        t = _ALIAS_TAGS.get(raw_t, raw_t)
+        is_math = t in _MATHML_TAGS
+        is_svg = t in _SVG_TAGS
+        if t not in _ALLOWED_TAGS and not is_math and not is_svg:
+            # 未知非危险标签：区分 C++/Java 头文件与泛型代码文本（如 <stdio.h>、<int>、未闭合 <T>） vs 纯包裹容器标签
+            has_close = f"</{raw_t}>" in self._source_lower
+            looks_like_code = (
+                raw_t in _CODE_LITERAL_TAGS
+                or raw_t.endswith((".h", ".hpp"))
+                or (not has_close)
+            )
+            if looks_like_code:
+                self._emit_literal(self.get_starttag_text() or f"<{tag}>")
+                if has_close:
+                    self._escaped_unknown_stack.append(raw_t)
+            return
+
         clean_attrs: list[str] = []
         if "style" in attr_map and attr_map["style"].strip():
             st = _sanitize_style(attr_map["style"])
@@ -223,8 +400,12 @@ class _StrictHtmlSanitizer(HTMLParser):
                 clean_attrs.append(f'style="{html_lib.escape(st, quote=True)}"')
         if t == "img":
             src = attr_map.get("src", "").strip()
+            if not src:
+                return
+            if src.startswith("//"):
+                src = "https:" + src
             if not (_IMG_SRC_DATA_RE.match(src) or _IMG_SRC_HTTPS_RE.match(src)):
-                raise ValueError("图片来源不在允许域（仅支持内嵌图片或 cctrcloud.net / aliyuncs.com）")
+                raise ValueError("图片来源不在允许域（仅支持内嵌图片或 cctrcloud.net / aliyuncs.com 等教育云域名）")
             if src.lower().startswith("http://"):
                 src = "https://" + src[len("http://"):]
             self.has_visible_content = True
@@ -236,6 +417,24 @@ class _StrictHtmlSanitizer(HTMLParser):
             for k in ("colspan", "rowspan"):
                 if k in attr_map and attr_map[k].isdigit():
                     clean_attrs.append(f'{k}="{attr_map[k]}"')
+        elif is_math:
+            self.has_visible_content = True
+            for k, v in attrs:
+                kl = k.lower()
+                if kl in _SAFE_MATHML_ATTRS and v is not None:
+                    clean_attrs.append(f'{kl}="{html_lib.escape(v, quote=True)}"')
+        elif is_svg:
+            if t in ("path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text"):
+                self.has_visible_content = True
+            for k, v in attrs:
+                kl = k.lower()
+                val = v or ""
+                if kl == "href" or kl == "xlink:href":
+                    if val.strip().startswith("#"):
+                        clean_attrs.append(f'{kl}="{html_lib.escape(val.strip(), quote=True)}"')
+                    continue
+                if kl in _SAFE_SVG_ATTRS:
+                    clean_attrs.append(f'{k if kl != "viewbox" else "viewBox"}="{html_lib.escape(val, quote=True)}"')
 
         attr_str = (" " + " ".join(clean_attrs)) if clean_attrs else ""
         if t in _VOID_TAGS:
@@ -244,9 +443,23 @@ class _StrictHtmlSanitizer(HTMLParser):
             self.out.append(f"<{t}{attr_str}>")
 
     def handle_endtag(self, tag: str):
-        t = tag.lower()
-        if t not in _ALLOWED_TAGS:
-            raise ValueError(f"暂不支持富文本标签：</{t}>")
+        raw_t = tag.lower()
+        if raw_t in _FORBIDDEN_TAGS:
+            raise ValueError(f"暂不支持富文本标签：</{raw_t}>")
+        if raw_t in _UNWRAP_TAGS or _NS_TAG_RE.match(raw_t) or raw_t == "input":
+            return
+        if raw_t == "option":
+            self.out.append("]</span> ")
+            return
+        if raw_t in ("audio", "video"):
+            self.out.append("</span>")
+            return
+        t = _ALIAS_TAGS.get(raw_t, raw_t)
+        if t not in _ALLOWED_TAGS and t not in _MATHML_TAGS and t not in _SVG_TAGS:
+            if raw_t in self._escaped_unknown_stack:
+                self._escaped_unknown_stack.remove(raw_t)
+                self._emit_literal(f"</{tag}>")
+            return
         if t not in _VOID_TAGS:
             self.out.append(f"</{t}>")
 
@@ -256,20 +469,27 @@ class _StrictHtmlSanitizer(HTMLParser):
         self.out.append(html_lib.escape(data, quote=False))
 
     def handle_entityref(self, name: str):
-        self.has_visible_content = True
+        if name.lower() not in _BLANK_ENTITY_NAMES:
+            self.has_visible_content = True
         self.out.append(f"&{name};")
 
     def handle_charref(self, name: str):
-        self.has_visible_content = True
+        try:
+            cp = int(name[1:], 16) if name.lower().startswith("x") else int(name, 10)
+        except ValueError:
+            cp = -1
+        if cp not in _BLANK_CODEPOINTS and not (cp >= 0 and chr(cp).isspace()):
+            self.has_visible_content = True
         self.out.append(f"&#{name};")
 
 
 def sanitize_rich_html(raw_html: str) -> str:
-    """校验并净化受限富文本 HTML；空内容或不支持的标签/图片来源会直接抛错。"""
+    """校验并净化受限富文本 HTML；空内容或危险标签/未授权外链图片会直接抛错。"""
     if not isinstance(raw_html, str) or not raw_html.strip():
         raise ValueError("富文本内容为空")
-    parser = _StrictHtmlSanitizer()
-    parser.feed(raw_html)
+    cleaned = _preclean_office_html(raw_html)
+    parser = _StrictHtmlSanitizer(cleaned.lower())
+    parser.feed(cleaned)
     parser.close()
     if not parser.has_visible_content:
         raise ValueError("富文本没有可见内容，无法确认题目或答案完整")
@@ -281,18 +501,17 @@ def has_visible_rich_content(raw_html: str) -> bool:
     stripped = (raw_html or "").strip()
     if not stripped:
         return False
-    if "<" in stripped and ">" in stripped:
+    cleaned = _preclean_office_html(stripped)
+    if "<" in cleaned and ">" in cleaned:
         try:
-            sanitize_rich_html(stripped)
+            sanitize_rich_html(cleaned)
             return True
-        except ValueError:
-            # 仅针对“无可见内容”视为空占位，不支持的标签/坏图仍需在上层暴露
-            text_only = re.sub(r"<[^>]+>", "", stripped).replace("&nbsp;", " ").replace("&#xa0;", " ")
-            has_img = bool(re.search(r"<img\b", stripped, re.I))
-            if not has_img and not _ZERO_WIDTH_RE.sub("", text_only):
+        except ValueError as exc:
+            msg = str(exc)
+            if "没有可见内容" in msg or "内容为空" in msg:
                 return False
             raise
-    return bool(_ZERO_WIDTH_RE.sub("", stripped))
+    return bool(_ZERO_WIDTH_RE.sub("", cleaned))
 
 
 def _render_text_or_html(val: str) -> tuple[str, bool]:
@@ -408,6 +627,8 @@ def build_export_document_html(
         '.option-body { display: inline; }'
         '.option-body.rich p:first-child { display: inline; }'
         'img { max-width: 100%; height: auto; vertical-align: middle; }'
+        'svg { max-width: 100%; height: auto; vertical-align: middle; }'
+        '.inline-ctrl { display: inline-block; padding: 0 3px; border: 1px solid #cbd5e1; border-radius: 3px; background: #f8fafc; font-size: 9.5pt; margin: 0 2px; }'
         'table { border-collapse: collapse; max-width: 100%; margin: 6pt 0; font-size: 9.5pt; }'
         'td, th { border: 1px solid #cbd5e1; padding: 4px 7px; font-size: 9.5pt !important; }'
         '.label { display: block; width: fit-content; margin: 7pt 0 3pt; padding: 1pt 6pt; border-radius: 4px; background: #ecfdf5; border: 1px solid #a7f3d0; font-weight: 700; font-size: 9pt; color: #047857; break-after: avoid; page-break-after: avoid; }'

@@ -289,3 +289,209 @@ def test_smart_pagination_keeps_short_questions_intact_and_breaks_after_long(tmp
     pdf_off = export_questions_to_pdf(qs, tmp_path, kernel="auto", filename="compact.pdf", smart_pagination=False)
     reader_off = pypdf.PdfReader(str(pdf_off))
     assert len(reader_off.pages) <= len(reader.pages)
+
+
+def test_word_smarttags_font_mso_comments_and_image_inlining(monkeypatch):
+    from cctr_export.core import exporter as exp_mod
+    from cctr_export.core.integrity import has_visible_rich_content
+
+    raw_word = (
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]-->'
+        '<p>载频 <st1:chmetcnv UnitName="Hz" SourceValue="3000">3000Hz</st1:chmetcnv>，'
+        '信息码 <st1:chsdate year="2001" month="1" day="1">1-1-1</st1:chsdate>，'
+        '<font size="4" face="宋体">基带系统</font><o:p></o:p></p>'
+    )
+    cleaned = sanitize_rich_html(raw_word)
+    assert "3000Hz" in cleaned
+    assert "1-1-1" in cleaned
+    assert "基带系统" in cleaned
+    assert "Normal" not in cleaned
+    assert "<st1:" not in cleaned
+    assert "<font" not in cleaned
+
+    # Pure Word comment metadata with no visible body must not leak text or raise error in optional analysis
+    assert not has_visible_rich_content(
+        '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Normal</w:View></w:WordDocument></xml><![endif]--><p> &nbsp; </p>'
+    )
+
+    # Dangerous tags must still be rejected
+    with pytest.raises(ValueError):
+        sanitize_rich_html("<script>alert(1)</script><p>x</p>")
+    with pytest.raises(ValueError):
+        sanitize_rich_html("<object data=\"x\"></object><p>x</p>")
+
+    # Verify remote OSS HTTP/HTTPS images get prefetched and inlined into data URIs
+    buf = io.BytesIO()
+    Image.new("RGB", (24, 24), color=(10, 20, 30)).save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    class _FakeResp:
+        status_code = 200
+        content = png_bytes
+
+    class _FakeSess:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get(self, url, *args, **kwargs):
+            return _FakeResp()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(exp_mod, "ResilientHttpSession", _FakeSess)
+    q_img = Question(
+        id="9:1",
+        question_type="简答题",
+        subject_html='<p><img src="http://ce-images.oss-cn-beijing.aliyuncs.com/school_U101441/a.png" /></p>',
+        answer="ok",
+        has_options=False,
+        options=[Option(is_true=True, html='<img src="https://ce-images.oss-cn-beijing.aliyuncs.com/school_U101441/b.png" />')],
+        subject_name="通信",
+        chapter_name="第六章",
+        analysis_html=raw_word,
+        is_choice=False,
+    )
+    inlined = exp_mod.prefetch_and_inline_images([q_img])
+    assert inlined[0].subject_html.startswith('<p><img src="data:image/png;base64,')
+    assert inlined[0].options[0].html.startswith('<img src="data:image/png;base64,')
+
+
+def test_saved_accounts_persistence_and_no_passwords(tmp_path: Path, monkeypatch):
+    from cctr_export.core import kernels
+    from cctr_export.ui import studio_web
+
+    settings_file = tmp_path / "settings.json"
+    monkeypatch.setattr(kernels, "SETTINGS_FILE", settings_file)
+    monkeypatch.setattr(studio_web, "get_all_tasks", lambda: [])
+
+    assert studio_web.get_saved_accounts() == []
+    res = studio_web.remember_saved_account("u101441", "20260001")
+    assert res == [{"school": "u101441", "username": "20260001"}]
+    res = studio_web.remember_saved_account("u101442", "20260002")
+    assert res[0] == {"school": "u101442", "username": "20260002"}
+    # Deduplicate and promote re-used account to top
+    res = studio_web.remember_saved_account("u101441", "20260001")
+    assert res == [
+        {"school": "u101441", "username": "20260001"},
+        {"school": "u101442", "username": "20260002"},
+    ]
+    # Ensure no password field is persisted
+    raw = settings_file.read_text(encoding="utf-8")
+    assert "password" not in raw.lower()
+
+    after_rm = studio_web.remove_saved_account("u101441", "20260001")
+    assert after_rm == [{"school": "u101442", "username": "20260002"}]
+
+
+def test_tabody_alias_and_query_questions_superset_count():
+    from cctr_export.core.api import CCTRClient
+    from cctr_export.core.models import Practice
+
+    # 1) <tabody> 错别字标签应自动规范化为 <tbody>，而非报不支持富文本标签
+    cleaned = sanitize_rich_html("<table><tabody><tr><td>ERP题库行</td></tr></tabody></table>")
+    assert cleaned == "<table><tbody><tr><td>ERP题库行</td></tr></tbody></table>"
+    assert "<tabody" not in cleaned
+
+    # 2) 接口报告 128 题但未练习+已练习去重后实际完整返回 134 题（>= 128）时应正常通过，少于 128 仍须报错
+    class _StubClient(CCTRClient):
+        def __init__(self, counts):
+            self._counts = counts
+            self.key = "k"
+
+        def get_chapter_and_question_types(self, practice):
+            return [], []
+
+        def _fetch_question_page_raw(self, practice, page_index, page_count, chapters, question_types, practice_type, id_param):
+            n, rep = self._counts[practice_type]
+            raw = [
+                {
+                    "questionid": f"{practice_type}_{i}",
+                    "questiontypeid": "1",
+                    "questiontypename": "单选题",
+                    "chapterid": "c1",
+                    "subjecthtml_svg": _gz_b64(f"<p>题目 {practice_type}_{i}</p>"),
+                    "answerhtml_svg": _gz_b64("<p>A</p>"),
+                    "analysishtml_svg": "",
+                    "options": [],
+                    "answer": "A",
+                }
+                for i in range(n)
+            ]
+            split = [",".join(str(i) for i in range(n))] if n else []
+            return raw, split, rep
+
+    p_more = Practice(
+        id=1,
+        courseid="c1",
+        practise_id="pr1",
+        teacher_id="t1",
+        lesson_name="新思想",
+        practice_name="导论至第7章",
+        teacher_name="张老师",
+        finish_time="2026-12-31",
+        question_count=128,
+    )
+    qs = _StubClient({0: (128, 128), 1: (6, 128)}).query_questions(p_more)
+    assert len(qs) == 134
+
+    p_short = Practice(
+        id=2,
+        courseid="c1",
+        practise_id="pr2",
+        teacher_id="t1",
+        lesson_name="新思想",
+        practice_name="缺题测试",
+        teacher_name="张老师",
+        finish_time="2026-12-31",
+        question_count=128,
+    )
+    with pytest.raises(RuntimeError, match="题数不匹配"):
+        _StubClient({0: (120, 128), 1: (0, 128)}).query_questions(p_short)
+
+
+def test_comprehensive_rich_text_edge_cases():
+    # 1) Office Word 粘贴 <meta>/<link>/粘连标签、交互控件、多媒体与未知容器标签均不得报错丢失内容
+    word_mixed = (
+        '<meta name="Generator" content="Microsoft Word 15">'
+        '<link rel="File-List" href="file:///C:/a/filelist.xml">'
+        '<title>文档</title>'
+        '<palign="center"><spanstyle="font-weight:bold">题干</span>'
+        '<input type="text" placeholder="填空" /><button>确定</button>'
+        '<audio src="a.mp3"></audio><custom-wrap>附加说明</custom-wrap></p>'
+    )
+    cleaned = sanitize_rich_html(word_mixed)
+    assert "题干" in cleaned
+    assert "[填空]" in cleaned
+    assert "确定" in cleaned
+    assert "[音频]" in cleaned
+    assert "附加说明" in cleaned
+    assert "<meta" not in cleaned and "<link" not in cleaned
+
+    # 2) C++/Java 代码尖括号与数学比较表达式完整保留，不被误删或报不支持标签
+    code_html = sanitize_rich_html("<p>#include <stdio.h> 与 vector<int>，且若 a<b 且 b>0 成立</p>")
+    assert "&lt;stdio.h&gt;" in code_html
+    assert "&lt;int&gt;" in code_html
+    assert "a&lt;b 且 b&gt;0" in code_html
+
+    # 3) MathML 与安全内联 SVG 可正常通过，且 <svg> 内嵌 <script> 仍严格拒绝
+    math_svg = sanitize_rich_html(
+        '<math xmlns="http://www.w3.org/1998/Math/MathML"><mfrac><mi>x</mi><mi>y</mi></mfrac></math>'
+        '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" onclick="evil()"/></svg>'
+    )
+    assert "<math" in math_svg and "<mfrac>" in math_svg
+    assert "<svg" in math_svg and "onclick" not in math_svg
+    with pytest.raises(ValueError):
+        sanitize_rich_html("<svg><script>alert(1)</script></svg>")
+
+    # 4) 支持 data:image/jpg、协议相对 //edu/cloud URL 以及 edu.cn 校内域名，拒绝非法外链
+    jpg_data = sanitize_rich_html('<img src="data:image/jpg;base64,/9j/4AAQ" />')
+    assert "data:image/jpg;base64," in jpg_data
+    edu_img = sanitize_rich_html('<img src="//cdn.tsinghua.edu.cn/pic/1.png" />')
+    assert "https://cdn.tsinghua.edu.cn/pic/1.png" in edu_img
+    with pytest.raises(ValueError):
+        sanitize_rich_html('<img src="//evil.com/x.png" />')
+
+
+
+

@@ -10,30 +10,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * 同步 Figma「Quiet Paper & Indigo Ink (v4)」极简桌面/移动端统一色板与字号规范。
+ * Editorial Atelier（瑞士印务工坊 · 纸墨与精密仪器美学）统一色彩与排印规范。
  */
 object CctrColors {
-    val BgCanvas = Color(0xFFF6F7FB)
-    val BgSurface = Color(0xFFFFFFFF)
-    val BgSubtle = Color(0xFFEEF1F7)
-    val BorderHairline = Color(0xFFE2E8F0)
-    val InkPrimary = Color(0xFF0F172A)
-    val InkSecondary = Color(0xFF475569)
-    val InkMuted = Color(0xFF64748B)
-    val AccentBlue = Color(0xFF4338CA)
-    val AccentSoft = Color(0xFFEEF2FF)
-    val Success = Color(0xFF059669)
-    val SuccessSoft = Color(0xFFECFDF5)
-    val Danger = Color(0xFFDC2626)
-    val DangerSoft = Color(0xFFFEF2F2)
+    val BgCanvas = Color(0xFFF4F3EF)      // 典藏石纹底框
+    val BgSurface = Color(0xFFFFFFFF)     // 纯白印张表层
+    val BgSheetSoft = Color(0xFFFAF9F6)   // 柔光米白纸面
+    val BgSubtle = Color(0xFFEAE7E0)      // 凹槽轨道底座
+    val BorderHairline = Color(0xFFE2DFD7)
+    val LineStrong = Color(0xFFCBC7BD)
+
+    val InkPrimary = Color(0xFF141413)    // 哑光碳黑（兼作主操作底色）
+    val InkSecondary = Color(0xFF57544E)
+    val InkMuted = Color(0xFF8A867E)
+
+    val AccentSeal = Color(0xFFC83E2B)    // 校对朱批红
+    val AccentSealSoft = Color(0xFFFAF0EE)
+    val StatusOk = Color(0xFF1E6B4E)      // 深林墨绿
+    val StatusOkSoft = Color(0xFFEDF5F1)
 }
 
 private val LightColorScheme = lightColorScheme(
-    primary = CctrColors.AccentBlue,
-    onPrimary = Color.White,
-    primaryContainer = CctrColors.AccentSoft,
-    onPrimaryContainer = CctrColors.AccentBlue,
-    secondary = CctrColors.Success,
+    primary = CctrColors.InkPrimary,
+    onPrimary = CctrColors.BgSheetSoft,
+    primaryContainer = CctrColors.BgSubtle,
+    onPrimaryContainer = CctrColors.InkPrimary,
+    secondary = CctrColors.StatusOk,
     onSecondary = Color.White,
     background = CctrColors.BgCanvas,
     onBackground = CctrColors.InkPrimary,
@@ -42,11 +44,11 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = CctrColors.BgSubtle,
     onSurfaceVariant = CctrColors.InkSecondary,
     outline = CctrColors.BorderHairline,
-    error = CctrColors.Danger
+    error = CctrColors.AccentSeal
 )
 
 private val CctrTypography = Typography(
-    titleLarge = TextStyle(fontSize = 19.sp, fontWeight = FontWeight.Bold, color = CctrColors.InkPrimary),
+    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary),
     titleMedium = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary),
     bodyMedium = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Normal, color = CctrColors.InkPrimary),
     labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, color = CctrColors.InkSecondary),

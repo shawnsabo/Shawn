@@ -20,13 +20,20 @@ class CaptchaOcr(context: Context) : AutoCloseable {
 
     init {
         val modelBytes = context.assets.open("common_old.onnx").use { it.readBytes() }
-        session = env.createSession(modelBytes, OrtSession.SessionOptions())
+        val opts = OrtSession.SessionOptions().apply {
+            setIntraOpNumThreads(2)
+        }
+        try {
+            session = env.createSession(modelBytes, opts)
+        } finally {
+            opts.close()
+        }
         val charsetJson = context.assets.open("ddddocr_charset.json").bufferedReader().use { it.readText() }
         val arr = JSONArray(charsetJson)
         charset = List(arr.length()) { i -> arr.optString(i, "") }
     }
 
-    fun recognize(imageBytes: ByteArray): String {
+    private fun decodeRawText(imageBytes: ByteArray): String {
         val raw = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return ""
         return try {
             val targetH = 64
@@ -69,7 +76,7 @@ class CaptchaOcr(context: Context) : AutoCloseable {
                             }
                             prevIdx = bestIdx
                         }
-                        sb.toString().replace(Regex("[^A-Za-z0-9]"), "")
+                        sb.toString()
                     }
                 }
             } finally {
@@ -78,6 +85,16 @@ class CaptchaOcr(context: Context) : AutoCloseable {
         } finally {
             raw.recycle()
         }
+    }
+
+    @Synchronized
+    fun recognize(imageBytes: ByteArray): String {
+        return decodeRawText(imageBytes).replace(Regex("[^A-Za-z0-9]"), "")
+    }
+
+    @Synchronized
+    fun recognizeSingleGlyph(imageBytes: ByteArray): String {
+        return decodeRawText(imageBytes).trim().take(1)
     }
 
     override fun close() {
