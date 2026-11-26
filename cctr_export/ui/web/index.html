@@ -466,6 +466,27 @@
 
   .sec-label { font-size: 11.5px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; display: block; }
   .brick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 18px; }
+  .source-tabs {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px;
+    background: var(--well); padding: 3px; border-radius: 7px;
+    margin-bottom: 16px;
+  }
+  .source-tab {
+    border: none; background: transparent; border-radius: 5px; height: 30px;
+    font-size: 11.5px; font-weight: 500; color: var(--ink-2); cursor: pointer;
+    transition: all 0.14s; white-space: nowrap; padding: 0 4px;
+  }
+  .source-tab:hover { color: var(--ink); }
+  .source-tab.active {
+    background: var(--paper); color: var(--ink); font-weight: 600;
+    box-shadow: 0 1px 2px rgba(20, 20, 19, 0.08);
+  }
+  .src-card {
+    background: var(--sheet-soft); border: 1px solid var(--line);
+    border-radius: 6px; padding: 14px; margin-bottom: 14px;
+    font-size: 12px; color: var(--ink-2); line-height: 1.65;
+  }
+  .src-card strong { display: block; color: var(--ink); font-size: 12.5px; margin-bottom: 4px; }
   .brick {
     position: relative;
     border: 1px solid var(--line); background: var(--sheet-soft);
@@ -816,45 +837,93 @@
 
             <div class="auth-sheet">
               <div class="sheet-head">
-                <h2>连接学校账号</h2>
-                <span>SESSION AUTH</span>
+                <h2 id="authSheetTitle">连接题库来源</h2>
+                <span>MULTI SOURCE</span>
               </div>
 
-              <div class="field">
-                <label for="schoolInput">学校代码</label>
-                <input class="input" id="schoolInput" placeholder="例如 u101441" autocomplete="organization">
+              <div class="source-tabs" role="tablist">
+                <button type="button" class="source-tab active" data-src="cctr" onclick="selectSourceTab('cctr')">融智云考</button>
+                <button type="button" class="source-tab" data-src="chaoxing" onclick="selectSourceTab('chaoxing')">超星学习通</button>
+                <button type="button" class="source-tab" data-src="yuketang" onclick="selectSourceTab('yuketang')">雨课堂</button>
+                <button type="button" class="source-tab" data-src="local" onclick="selectSourceTab('local')">本地导入</button>
               </div>
-              <div class="field">
-                <label for="userInput">学号 / 账号</label>
-                <input class="input" id="userInput" placeholder="输入学号或登录账号" autocomplete="username">
-              </div>
-              <div class="field">
-                <label for="passInput">密码</label>
-                <div class="input-wrap">
-                  <input class="input" id="passInput" type="password" placeholder="输入登录密码" style="padding-right:34px" autocomplete="current-password">
-                  <button type="button" class="eye-btn" onclick="togglePassword()" aria-label="显示或隐藏密码">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                  </button>
+
+              <div id="srcPaneCctr">
+                <div class="field">
+                  <label for="schoolInput">学校代码</label>
+                  <input class="input" id="schoolInput" placeholder="例如 u101441" autocomplete="organization">
                 </div>
-              </div>
-              <div class="field" style="margin-bottom:20px;">
-                <label for="captchaInput">
-                  <span>图形验证码</span>
-                  <span class="ocr-note wait" id="ocrStatusTag">等待加载…</span>
-                </label>
-                <div class="captcha-box">
-                  <input class="captcha-input" id="captchaInput" placeholder="自动识别或手动输入">
-                  <div class="captcha-img-cell" onclick="refreshCaptcha()" title="点击刷新验证码并重新识别">
-                    <img id="captchaImg" alt="图形验证码">
-                    <span id="captchaPlaceholder" class="mono" style="font-size:10.5px;color:#6e6b65;">加载中</span>
+                <div class="field">
+                  <label for="userInput">学号 / 账号</label>
+                  <input class="input" id="userInput" placeholder="输入学号或登录账号" autocomplete="username">
+                </div>
+                <div class="field">
+                  <label for="passInput">密码</label>
+                  <div class="input-wrap">
+                    <input class="input" id="passInput" type="password" placeholder="输入登录密码" style="padding-right:34px" autocomplete="current-password">
+                    <button type="button" class="eye-btn" onclick="togglePassword()" aria-label="显示或隐藏密码">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
                   </div>
                 </div>
+                <div class="field" style="margin-bottom:20px;">
+                  <label for="captchaInput">
+                    <span>图形验证码</span>
+                    <span class="ocr-note wait" id="ocrStatusTag">等待加载…</span>
+                  </label>
+                  <div class="captcha-box">
+                    <input class="captcha-input" id="captchaInput" placeholder="自动识别或手动输入">
+                    <div class="captcha-img-cell" onclick="refreshCaptcha()" title="点击刷新验证码并重新识别">
+                      <img id="captchaImg" alt="图形验证码">
+                      <span id="captchaPlaceholder" class="mono" style="font-size:10.5px;color:#6e6b65;">加载中</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button class="btn btn-carbon" id="loginBtn" style="width:100%;height:40px;font-size:13px;" onclick="submitLogin()">
+                  连接并载入题库
+                </button>
+                <div class="err-strip" id="loginErr"></div>
               </div>
 
-              <button class="btn btn-carbon" id="loginBtn" style="width:100%;height:40px;font-size:13px;" onclick="submitLogin()">
-                连接并载入题库
-              </button>
-              <div class="err-strip" id="loginErr"></div>
+              <div id="srcPaneChaoxing" style="display:none;">
+                <div class="src-card">
+                  <strong>内置浏览器登录 & font-cxsecret 字体自动解密</strong>
+                  支持学习通账号密码、手机扫码或高校统一身份认证（SSO）正常登录，进入「章节测验 / 作业查看 / 试卷详情」后点击顶部「提取本页题目」，端侧 OCR 将自动还原加密乱码汉字并保留插图。
+                </div>
+                <button class="btn btn-carbon" style="width:100%;height:40px;font-size:13px;" onclick="openPlatformBrowser('chaoxing')">
+                  打开超星学习通捕获窗口 →
+                </button>
+              </div>
+
+              <div id="srcPaneYuketang" style="display:none;">
+                <div class="src-card">
+                  <strong>微信扫码登录 & 接口/加密字体自动还原</strong>
+                  内置拦截雨课堂作业详情数据并兼容动态混淆字体；请选择你所在学校使用的雨课堂版本：
+                </div>
+                <div class="field" style="margin-bottom:16px;">
+                  <label for="yktEditionSel">选择雨课堂平台分支</label>
+                  <select class="select" id="yktEditionSel">
+                    <option value="yuketang">雨课堂（标准版 · www.yuketang.cn）</option>
+                    <option value="yuketang_cj">长江雨课堂（changjiang.yuketang.cn）</option>
+                    <option value="yuketang_ht">荷塘雨课堂（hetang.yuketang.cn）</option>
+                    <option value="yuketang_hh">黄河雨课堂（huanghe.yuketang.cn）</option>
+                  </select>
+                </div>
+                <button class="btn btn-carbon" style="width:100%;height:40px;font-size:13px;" onclick="openPlatformBrowser(qs('yktEditionSel').value)">
+                  打开雨课堂微信扫码登录 →
+                </button>
+              </div>
+
+              <div id="srcPaneLocal" style="display:none;">
+                <div class="src-card">
+                  <strong>主流刷题软件 / 通用格式双向互转</strong>
+                  支持直接导入 <b>考试宝 / 磨题帮 Excel（.xlsx）</b>、<b>Word（.docx）</b>、<b>TXT / Markdown</b>、<b>JSON</b>（含学习通/雨课堂导出 JSON）以及 <b>CSV / Anki（.tsv）</b>，统一重排为 10.5pt A4 PDF 或互相转换导出。
+                </div>
+                <button class="btn btn-carbon" style="width:100%;height:40px;font-size:13px;" onclick="importLocalFiles()">
+                  选择本地题库文件并载入（可多选） →
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -866,7 +935,9 @@
               <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="input" id="courseSearch" placeholder="按课程名称、练习名称或教师筛选…" oninput="renderPracticeGrid()">
             </div>
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button class="btn btn-outline" onclick="openPlatformBrowser('chaoxing')">+ 网页补抓</button>
+              <button class="btn btn-outline" onclick="importLocalFiles()">+ 导入文件</button>
               <button class="btn btn-outline" onclick="selectAllPractices(true)">全选当前</button>
               <button class="btn btn-outline" onclick="selectAllPractices(false)">清空</button>
               <button class="btn btn-text" onclick="refreshPractices()">刷新</button>
@@ -900,7 +971,7 @@
                 <span id="studioScopeBadge">0 项练习</span>
               </div>
 
-              <span class="sec-label">交付载体</span>
+              <span class="sec-label">交付载体（排版印刷 & 刷题软件互转）</span>
               <div class="brick-grid">
                 <button class="brick active" data-fmt="pdf" onclick="setFormat('pdf')">
                   <strong>A4 合并 PDF</strong>
@@ -913,6 +984,22 @@
                 <button class="brick" data-fmt="img" onclick="setFormat('img')">
                   <strong>逐题 PNG 图包</strong>
                   <span>高清切片归档</span>
+                </button>
+                <button class="brick" data-fmt="xlsx" onclick="setFormat('xlsx')">
+                  <strong>刷题 Excel (.xlsx)</strong>
+                  <span>适配考试宝 / 磨题帮</span>
+                </button>
+                <button class="brick" data-fmt="anki" onclick="setFormat('anki')">
+                  <strong>Anki 记忆卡 (.tsv)</strong>
+                  <span>直接导入 Anki 卡片</span>
+                </button>
+                <button class="brick" data-fmt="md" onclick="setFormat('md')">
+                  <strong>Markdown (.md)</strong>
+                  <span>Notion / Obsidian</span>
+                </button>
+                <button class="brick" data-fmt="json" onclick="setFormat('json')">
+                  <strong>标准 JSON (.json)</strong>
+                  <span>完整结构无损归档</span>
                 </button>
               </div>
 
@@ -1178,6 +1265,22 @@ function refreshCaptcha() {
   qs('captchaPlaceholder').style.display = 'inline';
   qs('captchaImg').style.display = 'none';
   bridge.fetchCaptcha();
+}
+
+function selectSourceTab(src) {
+  document.querySelectorAll('.source-tab').forEach(b => b.classList.toggle('active', b.dataset.src === src));
+  qs('srcPaneCctr').style.display = src === 'cctr' ? 'block' : 'none';
+  qs('srcPaneChaoxing').style.display = src === 'chaoxing' ? 'block' : 'none';
+  qs('srcPaneYuketang').style.display = src === 'yuketang' ? 'block' : 'none';
+  qs('srcPaneLocal').style.display = src === 'local' ? 'block' : 'none';
+}
+
+function openPlatformBrowser(key) {
+  if (bridge && bridge.openPlatformBrowser) bridge.openPlatformBrowser(key || 'chaoxing');
+}
+
+function importLocalFiles() {
+  if (bridge && bridge.importLocalFiles) bridge.importLocalFiles();
 }
 
 function submitLogin() {
@@ -1563,7 +1666,15 @@ function renderTasksUI() {
     qs('activityLabel').textContent = '空闲';
   }
 
-  const fmtNames = { pdf: 'A4 PDF', zip: '分类 ZIP', img: 'PNG 图包' };
+  const fmtNames = {
+    pdf: 'A4 PDF',
+    zip: '分类 ZIP',
+    img: 'PNG 图包',
+    xlsx: 'Excel 刷题表',
+    anki: 'Anki 记忆卡',
+    md: 'Markdown 讲义',
+    json: '结构化 JSON'
+  };
   const statusLabels = { success: '完成', processing: '制版中', waiting: '队列中', failed: '失败' };
   qs('historySummary').textContent = tasksCache.length
     ? `共 ${tasksCache.length} 条归档记录`
@@ -1743,6 +1854,32 @@ function initBridge() {
       goStep(1);
       showToast(`已载入 ${practices.length} 项练习`);
     });
+
+    if (bridge.externalBanksLoaded) {
+      bridge.externalBanksLoaded.connect(raw => {
+        const res = JSON.parse(raw);
+        if (!res.ok || !Array.isArray(res.practices) || !res.practices.length) {
+          if (Array.isArray(res.errors) && res.errors.length) showToast(res.errors[0]);
+          return;
+        }
+        const existingIds = new Set(practices.map(p => String(p.id)));
+        res.practices.forEach(p => {
+          const sid = String(p.id);
+          if (!existingIds.has(sid)) {
+            practices.push(p);
+            existingIds.add(sid);
+          }
+          selectedIds.add(sid);
+        });
+        isLoggedIn = true;
+        qs('sessionPill').classList.add('show');
+        qs('sessionLabel').textContent = `${res.sourceLabel || '多平台题库'} · ${practices.length} 份`;
+        qs('switchAccBtn').style.display = 'inline-flex';
+        renderPracticeGrid();
+        goStep(1);
+        showToast(`已导入 ${res.practices.length} 份题库（合计 ${practices.length} 项）`);
+      });
+    }
 
     bridge.filtersReady.connect(raw => {
       const res = JSON.parse(raw);

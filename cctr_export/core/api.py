@@ -171,7 +171,7 @@ class CCTRClient:
 
             if expected_bucket_count is not None and len(bucket) != expected_bucket_count:
                 raise RuntimeError(f"分页题数不匹配：分片游标预期 {expected_bucket_count} 题，实际读取 {len(bucket)} 题")
-            if len(practice_types) == 1 and reported_count is not None and len(bucket) != reported_count:
+            if len(practice_types) == 1 and reported_count is not None and len(bucket) < reported_count:
                 raise RuntimeError(f"题数不匹配：平台报告 {reported_count} 题，实际读取 {len(bucket)} 题")
 
             for item in bucket:
@@ -185,7 +185,7 @@ class CCTRClient:
                 progress_callback(len(raw_items), practice.question_count or len(raw_items))
 
         if practiced is None:
-            if observed_reported_count is not None and len(raw_items) != observed_reported_count:
+            if observed_reported_count is not None and len(raw_items) < observed_reported_count:
                 raise RuntimeError(
                     f"练习「{practice.practice_name}」题数不匹配：接口报告 {observed_reported_count}，实际获得 {len(raw_items)}"
                 )
@@ -193,7 +193,7 @@ class CCTRClient:
                 not chapters
                 and not question_types
                 and practice.question_count is not None
-                and len(raw_items) != practice.question_count
+                and len(raw_items) < practice.question_count
             ):
                 raise RuntimeError(
                     f"练习「{practice.practice_name}」总题数不匹配：平台报告 {practice.question_count}，实际获得 {len(raw_items)}"

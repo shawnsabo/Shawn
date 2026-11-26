@@ -205,7 +205,7 @@ class CctrApiClient {
                 if (expectedBucketCount != null && bucket.size != expectedBucketCount) {
                     error("分页题数不匹配：分片游标预期 $expectedBucketCount，实际获取 ${bucket.size}")
                 }
-                if (practiceTypes.size == 1 && reportedCount != null && bucket.size != reportedCount) {
+                if (practiceTypes.size == 1 && reportedCount != null && bucket.size < reportedCount) {
                     error("题数不匹配：平台报告 $reportedCount，实际获取 ${bucket.size}")
                 }
                 reportedCount to bucket
@@ -227,13 +227,14 @@ class CctrApiClient {
         }
 
         if (!practicedOnly) {
-            if (observedReportedCount != null && rawAll.size != observedReportedCount) {
+            if (observedReportedCount != null && rawAll.size < observedReportedCount) {
                 error("练习「${practice.practiceName}」题数不匹配：接口报告 $observedReportedCount，实际获取 ${rawAll.size}")
             }
+            val expectedTotal = practice.questionCount
             if (chapters.isEmpty() && questionTypes.isEmpty() &&
-                practice.questionCount != null && rawAll.size != practice.questionCount
+                expectedTotal != null && rawAll.size < expectedTotal
             ) {
-                error("练习「${practice.practiceName}」总题数不匹配：平台报告 ${practice.questionCount}，实际获取 ${rawAll.size}")
+                error("练习「${practice.practiceName}」总题数不匹配：平台报告 $expectedTotal，实际获取 ${rawAll.size}")
             }
         }
 

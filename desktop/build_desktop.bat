@@ -1,18 +1,17 @@
 @echo off
-REM 统一桌面版单文件打包脚本（PySide6 + WebEngine 无损 A4 PDF + ddddocr 自动识别验证码）
-REM 产物：dist\CCTRCloudExportDesktop.exe
+chcp 65001 >nul
+setlocal
+echo === 安装/同步桌面版依赖（含 SOCKS5 与完整运行时组件） ===
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller
 
-python -m pip install -r "%~dp0..\requirements.txt" pyinstaller
+echo === 清理宿主 PATH 干扰后打包纯净单文件桌面端 (PyInstaller Spec) ===
+set "PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0"
+.\.venv\Scripts\python.exe -m PyInstaller --clean --noconfirm CCTRCloudExportDesktop.spec
 
-python -m PyInstaller --onefile --noconsole --noconfirm --name CCTRCloudExportDesktop ^
-  --paths "%~dp0.." ^
-  --add-data "%~dp0..\cctr_export\ui\web;cctr_export\ui\web" ^
-  --collect-all ddddocr ^
-  --collect-all onnxruntime ^
-  "%~dp0..\main.py"
-
-if not exist "%~dp0..\成品" mkdir "%~dp0..\成品"
-copy /Y "%~dp0..\dist\CCTRCloudExportDesktop.exe" "%~dp0..\成品\CCTRCloudExportDesktop.exe" >nul
-
-echo.
-echo 产物: %~dp0..\成品\CCTRCloudExportDesktop.exe
+if exist dist\CCTRCloudExportDesktop.exe (
+    copy /Y dist\CCTRCloudExportDesktop.exe 成品\CCTRCloudExportDesktop.exe >nul
+    echo 打包完成: 成品\CCTRCloudExportDesktop.exe
+) else (
+    echo 打包失败: 未生成 dist\CCTRCloudExportDesktop.exe
+    exit /b 1
+)

@@ -203,4 +203,39 @@ class IntegrityTest {
         assertEquals(5, heavyChunks.size)
         assertEquals(heavy.map { it.id }, heavyChunks.flatten().map { it.id })
     }
+
+    @Test
+    fun tabodyTypoAliasIsNormalizedToTbody() {
+        val cleaned = Integrity.sanitizeRichHtml("<table><tabody><tr><td>ERP行</td></tr></tabody></table>")
+        assertEquals("<table><tbody><tr><td>ERP行</td></tr></tbody></table>", cleaned)
+        assertFalse(cleaned.contains("<tabody"))
+    }
+
+    @Test
+    fun comprehensiveRichTextEdgeCasesWorkOnAndroid() {
+        val mixed = "<meta name=\"Generator\" content=\"Word\"><palign=\"center\"><spanstyle=\"font-weight:bold\">题干</span>" +
+            "<input type=\"text\" placeholder=\"填空\" /><audio src=\"a.mp3\"></audio>" +
+            "#include <stdio.h> vector<int> 若 a<b 且 b>0</p>"
+        val clean = Integrity.sanitizeRichHtml(mixed)
+        assertTrue(clean.contains("题干"))
+        assertTrue(clean.contains("[填空]"))
+        assertTrue(clean.contains("[音频]"))
+        assertTrue(clean.contains("&lt;stdio.h&gt;"))
+        assertTrue(clean.contains("&lt;int&gt;"))
+        assertTrue(clean.contains("a&lt;b 且 b&gt;0"))
+
+        val mathSvg = Integrity.sanitizeRichHtml(
+            "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mfrac><mi>x</mi><mi>y</mi></mfrac></math>" +
+                "<svg viewBox=\"0 0 20 20\"><circle cx=\"10\" cy=\"10\" r=\"8\" onclick=\"evil()\"/></svg>"
+        )
+        assertTrue(mathSvg.contains("<math") && mathSvg.contains("<svg") && !mathSvg.contains("onclick"))
+        var threwSvgScript = false
+        try {
+            Integrity.sanitizeRichHtml("<svg><script>alert(1)</script></svg>")
+        } catch (_: IllegalArgumentException) {
+            threwSvgScript = true
+        }
+        assertTrue(threwSvgScript)
+        assertTrue(Integrity.sanitizeRichHtml("<img src=\"//cdn.tsinghua.edu.cn/pic/1.png\" />").contains("https://cdn.tsinghua.edu.cn/pic/1.png"))
+    }
 }

@@ -2,6 +2,13 @@ package com.cctr.export.ui
 
 import android.content.Context
 import android.content.Intent
+import android.view.ViewGroup
+import android.webkit.CookieManager
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -11,6 +18,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -73,10 +81,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.FileProvider
 import com.cctr.export.core.AnswerVariant
 import com.cctr.export.core.ExportFormat
 import com.cctr.export.core.PracticeItem
+import com.cctr.export.core.WebPlatformExtractor
+import org.json.JSONObject
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -157,6 +168,10 @@ fun MainScreen(vm: MainViewModel) {
                 }
                 AtelierPhoneBottomBar(vm = vm, state = state, navTabs = navTabs)
             }
+        }
+
+        if (state.browserVisible) {
+            PlatformCaptureBrowserOverlay(vm = vm, state = state)
         }
     }
 }
@@ -323,6 +338,7 @@ private fun AtelierTabletRail(
                 Text("Download/CCTRExport", fontSize = 10.5.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+
     }
 }
 
@@ -455,6 +471,7 @@ private fun AtelierPhoneBottomBar(
                 }
             }
         }
+
     }
 }
 
@@ -598,6 +615,7 @@ private fun AtelierTextField(
                 trailing()
             }
         }
+
     }
 }
 
@@ -674,6 +692,7 @@ private fun AtelierSquareCheck(checked: Boolean) {
                 )
             }
         }
+
     }
 }
 
@@ -709,6 +728,7 @@ private fun AtelierSegmentedRow(
                 }
             }
         }
+
     }
 }
 
@@ -946,11 +966,19 @@ private fun QuickUtilityColumn(vm: MainViewModel, state: MainUiState) {
                 }
             }
         }
+
     }
 }
 
 @Composable
 private fun AtelierAuthSheet(vm: MainViewModel, state: MainUiState, modifier: Modifier) {
+    val context = LocalContext.current
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) vm.importUriFiles(context, uris)
+    }
+
     Surface(
         color = CctrColors.BgSurface,
         shape = RoundedCornerShape(8.dp),
@@ -963,117 +991,233 @@ private fun AtelierAuthSheet(vm: MainViewModel, state: MainUiState, modifier: Mo
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("连接学校账号", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
-                Text("SESSION AUTH", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
+                Text("连接题库来源", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                Text("MULTI SOURCE", fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
             }
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
 
-            AtelierTextField(
-                value = state.schoolCode,
-                onValueChange = vm::updateSchoolCode,
-                label = "学校代码",
-                placeholder = "例如 u101441"
-            )
-            AtelierTextField(
-                value = state.username,
-                onValueChange = vm::updateUsername,
-                label = "学号 / 账号",
-                placeholder = "输入学号或登录账号"
-            )
-            AtelierTextField(
-                value = state.password,
-                onValueChange = vm::updatePassword,
-                label = "密码",
-                placeholder = "输入登录密码",
-                isPassword = true
+            val tabs = SourceTab.entries
+            AtelierSegmentedRow(
+                labels = tabs.map { it.label },
+                selectedIndex = tabs.indexOf(state.sourceTab).coerceAtLeast(0),
+                onSelect = { idx -> vm.setSourceTab(tabs[idx]) }
             )
 
-            // Integrated graphic captcha bar
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("图形验证码", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkSecondary)
-                    Text(
-                        text = if (state.captchaAutoRecognized) "OCR · ${state.captchaCode}" else state.captchaStatus,
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = if (state.captchaAutoRecognized) CctrColors.StatusOk else CctrColors.InkMuted
+            when (state.sourceTab) {
+                SourceTab.CCTR -> {
+                    AtelierTextField(
+                        value = state.schoolCode,
+                        onValueChange = vm::updateSchoolCode,
+                        label = "学校代码",
+                        placeholder = "例如 u101441"
+                    )
+                    AtelierTextField(
+                        value = state.username,
+                        onValueChange = vm::updateUsername,
+                        label = "学号 / 账号",
+                        placeholder = "输入学号或登录账号"
+                    )
+                    AtelierTextField(
+                        value = state.password,
+                        onValueChange = vm::updatePassword,
+                        label = "密码",
+                        placeholder = "输入登录密码",
+                        isPassword = true
+                    )
+
+                    // Integrated graphic captcha bar
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("图形验证码", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkSecondary)
+                            Text(
+                                text = if (state.captchaAutoRecognized) "OCR · ${state.captchaCode}" else state.captchaStatus,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (state.captchaAutoRecognized) CctrColors.StatusOk else CctrColors.InkMuted
+                            )
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .background(CctrColors.BgSurface, RoundedCornerShape(6.dp))
+                                .border(1.dp, CctrColors.LineStrong, RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(6.dp))
+                        ) {
+                            Box(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                                if (state.captchaCode.isEmpty()) {
+                                    Text("自动识码中", fontSize = 13.sp, color = CctrColors.InkMuted)
+                                }
+                                BasicTextField(
+                                    value = state.captchaCode,
+                                    onValueChange = vm::updateCaptchaCode,
+                                    singleLine = true,
+                                    cursorBrush = SolidColor(CctrColors.InkPrimary),
+                                    textStyle = TextStyle(
+                                        color = CctrColors.InkPrimary,
+                                        fontSize = 14.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.SemiBold,
+                                        letterSpacing = 2.5.sp
+                                    ),
+                                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = "图形验证码" }
+                                )
+                            }
+                            Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(CctrColors.BorderHairline))
+                            val captchaImage = remember(state.captchaBitmap) { state.captchaBitmap?.asImageBitmap() }
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .width(112.dp)
+                                    .fillMaxHeight()
+                                    .background(Color.White)
+                                    .clickable { vm.loadCaptcha() }
+                            ) {
+                                when {
+                                    state.captchaLoading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 1.8.dp, color = CctrColors.InkPrimary)
+                                    captchaImage != null -> Image(
+                                        bitmap = captchaImage,
+                                        contentDescription = "刷新验证码",
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize().padding(3.dp)
+                                    )
+                                    else -> Text("点击重试", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
+                                }
+                            }
+                        }
+                    }
+
+                    state.loginError?.let { err ->
+                        Surface(
+                            color = CctrColors.AccentSealSoft,
+                            border = BorderStroke(1.dp, CctrColors.AccentSeal.copy(alpha = 0.28f)),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(err, color = CctrColors.AccentSeal, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+                        }
+                    }
+
+                    AtelierPrimaryButton(
+                        text = if (state.loginBusy) "正在载入目录…" else "连接并载入题库",
+                        onClick = { vm.loginAndLoadPractices() },
+                        enabled = !state.loginBusy,
+                        loading = state.loginBusy
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .background(CctrColors.BgSurface, RoundedCornerShape(6.dp))
-                        .border(1.dp, CctrColors.LineStrong, RoundedCornerShape(6.dp))
-                        .clip(RoundedCornerShape(6.dp))
-                ) {
-                    Box(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
-                        if (state.captchaCode.isEmpty()) {
-                            Text("自动识码中", fontSize = 13.sp, color = CctrColors.InkMuted)
-                        }
-                        BasicTextField(
-                            value = state.captchaCode,
-                            onValueChange = vm::updateCaptchaCode,
-                            singleLine = true,
-                            cursorBrush = SolidColor(CctrColors.InkPrimary),
-                            textStyle = TextStyle(
-                                color = CctrColors.InkPrimary,
-                                fontSize = 14.sp,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 2.5.sp
-                            ),
-                            modifier = Modifier.fillMaxWidth().semantics { contentDescription = "图形验证码" }
-                        )
-                    }
-                    Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(CctrColors.BorderHairline))
-                    val captchaImage = remember(state.captchaBitmap) { state.captchaBitmap?.asImageBitmap() }
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .width(112.dp)
-                            .fillMaxHeight()
-                            .background(Color.White)
-                            .clickable { vm.loadCaptcha() }
+
+                SourceTab.CHAOXING -> {
+                    Surface(
+                        color = CctrColors.BgSheetSoft,
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        when {
-                            state.captchaLoading -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 1.8.dp, color = CctrColors.InkPrimary)
-                            captchaImage != null -> Image(
-                                bitmap = captchaImage,
-                                contentDescription = "刷新验证码",
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize().padding(3.dp)
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("内置浏览器登录 & font-cxsecret 字体自动解密", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                            Text(
+                                "支持学习通密码、App 扫码或学校统一身份认证登录；进入章节测验 / 作业详情页后点右上角「提取本页」，端侧 ONNX 自动还原乱码汉字。",
+                                fontSize = 11.5.sp,
+                                color = CctrColors.InkSecondary
                             )
-                            else -> Text("点击重试", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted)
                         }
                     }
+                    AtelierPrimaryButton(
+                        text = "打开超星学习通捕获页 →",
+                        onClick = { vm.openPlatformBrowser("chaoxing") }
+                    )
+                }
+
+                SourceTab.YUKETANG -> {
+                    Surface(
+                        color = CctrColors.BgSheetSoft,
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("雨课堂微信扫码登录 & 加密字体还原", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                            Text(
+                                "支持标准版、长江、荷塘、黄河雨课堂，自动拦截作业接口并结合端侧 OCR 还原加密字体。",
+                                fontSize = 11.5.sp,
+                                color = CctrColors.InkSecondary
+                            )
+                        }
+                    }
+                    val yktPresets = remember { WebPlatformExtractor.PLATFORM_PRESETS.filter { it.key.startsWith("yuketang") } }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("选择雨课堂版本", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkSecondary)
+                        yktPresets.chunked(2).forEach { pair ->
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                pair.forEach { preset ->
+                                    val sel = state.yuketangPresetKey == preset.key
+                                    Surface(
+                                        color = if (sel) CctrColors.BgSurface else CctrColors.BgSheetSoft,
+                                        border = BorderStroke(1.dp, if (sel) CctrColors.InkPrimary else CctrColors.BorderHairline),
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.weight(1f).height(36.dp).clickable { vm.setYuketangPreset(preset.key) }
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(preset.label, fontSize = 12.sp, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal, color = CctrColors.InkPrimary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    AtelierPrimaryButton(
+                        text = "打开雨课堂微信扫码登录 →",
+                        onClick = { vm.openPlatformBrowser(state.yuketangPresetKey) }
+                    )
+                }
+
+                SourceTab.LOCAL_FILE -> {
+                    Surface(
+                        color = CctrColors.BgSheetSoft,
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("主流刷题软件 / 通用格式导入", fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
+                            Text(
+                                "支持考试宝/磨题帮 Excel（.xlsx）、Word（.docx）、TXT / Markdown、JSON（含学习通/雨课堂 JSON）以及 CSV / Anki（.tsv），统一排版或互转导出。",
+                                fontSize = 11.5.sp,
+                                color = CctrColors.InkSecondary
+                            )
+                        }
+                    }
+                    state.externalError?.let { err ->
+                        Surface(
+                            color = CctrColors.AccentSealSoft,
+                            border = BorderStroke(1.dp, CctrColors.AccentSeal.copy(alpha = 0.28f)),
+                            shape = RoundedCornerShape(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(err, color = CctrColors.AccentSeal, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+                        }
+                    }
+                    AtelierPrimaryButton(
+                        text = if (state.importBusy) "正在解析题库文件…" else "选择题库文件并载入 →",
+                        onClick = { filePicker.launch(arrayOf("*/*")) },
+                        enabled = !state.importBusy,
+                        loading = state.importBusy
+                    )
                 }
             }
-
-            state.loginError?.let { err ->
-                Surface(
-                    color = CctrColors.AccentSealSoft,
-                    border = BorderStroke(1.dp, CctrColors.AccentSeal.copy(alpha = 0.28f)),
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(err, color = CctrColors.AccentSeal, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
-                }
-            }
-
-            AtelierPrimaryButton(
-                text = if (state.loginBusy) "正在载入目录…" else "连接并载入题库",
-                onClick = { vm.loginAndLoadPractices() },
-                enabled = !state.loginBusy,
-                loading = state.loginBusy
-            )
         }
     }
 }
 
 @Composable
 private fun PracticePickerView(vm: MainViewModel, state: MainUiState, isTablet: Boolean) {
+    val context = LocalContext.current
+    val addFilePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) vm.importUriFiles(context, uris)
+    }
     val kw = state.practiceSearch.trim()
     val filtered = remember(state.practices, kw) {
         if (kw.isEmpty()) state.practices
@@ -1106,6 +1250,14 @@ private fun PracticePickerView(vm: MainViewModel, state: MainUiState, isTablet: 
                 label = "",
                 placeholder = "按课程名称、练习或教师筛选…",
                 modifier = Modifier.weight(1f)
+            )
+            AtelierGhostButton(
+                text = "+ 网页",
+                onClick = { vm.openPlatformBrowser("chaoxing") }
+            )
+            AtelierGhostButton(
+                text = "+ 文件",
+                onClick = { addFilePicker.launch(arrayOf("*/*")) }
             )
             AtelierGhostButton(
                 text = if (state.selectedPracticeIds.size == state.practices.size && state.practices.isNotEmpty()) "清空" else "全选",
@@ -1195,6 +1347,7 @@ private fun PracticePickerView(vm: MainViewModel, state: MainUiState, isTablet: 
                 )
             }
         }
+
     }
 }
 
@@ -1263,6 +1416,7 @@ private fun PracticeLedgerCard(
                 }
             }
         }
+
     }
 }
 
@@ -1384,6 +1538,7 @@ private fun ExportStatusBanner(vm: MainViewModel, state: MainUiState) {
                 }
             }
         }
+
     }
 }
 
@@ -1403,27 +1558,30 @@ private fun ExportParamsPanel(vm: MainViewModel, state: MainUiState) {
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
 
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("交付载体", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkSecondary)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ExportFormat.entries.forEach { fmt ->
-                        val sel = state.exportFormat == fmt
-                        Surface(
-                            color = if (sel) CctrColors.BgSurface else CctrColors.BgSheetSoft,
-                            border = BorderStroke(1.dp, if (sel) CctrColors.InkPrimary else CctrColors.BorderHairline),
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier.weight(1f).height(76.dp).clickable { vm.setExportFormat(fmt) }
-                        ) {
-                            Box(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-                                if (sel) {
-                                    Box(modifier = Modifier.align(Alignment.TopEnd).size(6.dp).background(CctrColors.InkPrimary, CircleShape))
-                                }
-                                Column {
-                                    Text(fmt.label, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary)
-                                    Spacer(Modifier.height(3.dp))
-                                    Text(fmt.subtitle, fontSize = 11.sp, color = CctrColors.InkMuted, maxLines = 2)
+                Text("交付载体（排版印刷 & 刷题互转）", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkSecondary)
+                ExportFormat.entries.chunked(2).forEach { pair ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        pair.forEach { fmt ->
+                            val sel = state.exportFormat == fmt
+                            Surface(
+                                color = if (sel) CctrColors.BgSurface else CctrColors.BgSheetSoft,
+                                border = BorderStroke(1.dp, if (sel) CctrColors.InkPrimary else CctrColors.BorderHairline),
+                                shape = RoundedCornerShape(6.dp),
+                                modifier = Modifier.weight(1f).height(68.dp).clickable { vm.setExportFormat(fmt) }
+                            ) {
+                                Box(modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                    if (sel) {
+                                        Box(modifier = Modifier.align(Alignment.TopEnd).size(6.dp).background(CctrColors.InkPrimary, CircleShape))
+                                    }
+                                    Column {
+                                        Text(fmt.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = CctrColors.InkPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(fmt.subtitle, fontSize = 10.5.sp, color = CctrColors.InkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
                                 }
                             }
                         }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -1501,6 +1659,7 @@ private fun ExportParamsPanel(vm: MainViewModel, state: MainUiState) {
                 )
             }
         }
+
     }
 }
 
@@ -1620,6 +1779,7 @@ private fun A4SpecimenPanel(state: MainUiState) {
                 SpecimenMetaRow("输出目录", "Download/CCTRExport")
             }
         }
+
     }
 }
 
@@ -1687,6 +1847,7 @@ private fun AuditLogsStage(vm: MainViewModel, state: MainUiState, isTablet: Bool
                 }
             }
         }
+
     }
 }
 
@@ -1737,6 +1898,7 @@ private fun ArchiveFilesStage(state: MainUiState, isTablet: Boolean) {
                 }
             }
         }
+
     }
 }
 
@@ -1772,12 +1934,147 @@ private fun ArchiveFileRowCard(context: Context, item: SavedFileUi) {
                 Text("${item.sizeKb} KB · 点击打开或分享成稿", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = CctrColors.InkMuted, maxLines = 1)
             }
         }
+
+    }
+}
+
+private fun decodeJsResult(raw: String?): String {
+    val t = raw?.trim().orEmpty()
+    return if (t.startsWith("\"") && t.endsWith("\"")) {
+        runCatching { JSONObject("{\"v\":$t}").getString("v") }.getOrDefault(t)
+    } else t
+}
+
+@Composable
+private fun PlatformCaptureBrowserOverlay(vm: MainViewModel, state: MainUiState) {
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CctrColors.BgCanvas)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(CctrColors.BgSurface)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AtelierGhostButton(text = "关闭", onClick = { vm.closePlatformBrowser() })
+                Text(
+                    text = state.browserStatus,
+                    fontSize = 11.5.sp,
+                    color = if (state.browserStatus.startsWith("✓")) CctrColors.StatusOk else CctrColors.InkSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                AtelierGhostButton(
+                    text = if (state.captureBusy) "解析中…" else "提取本页",
+                    enabled = !state.captureBusy && webViewRef != null,
+                    onClick = {
+                        webViewRef?.evaluateJavascript(WebPlatformExtractor.EXTRACT_QUESTIONS_JS) { raw ->
+                            vm.ingestCapturedWebPayload(decodeJsResult(raw))
+                        }
+                    }
+                )
+                AtelierPrimaryButton(
+                    text = "完成 (${state.capturedCount})",
+                    enabled = state.practices.isNotEmpty(),
+                    onClick = { vm.finishBrowserCaptureAndProceed() },
+                    modifier = Modifier.width(96.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = CctrColors.BgSheetSoft,
+                    border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.clickable { webViewRef?.goBack() }
+                ) {
+                    Text("← 后退", fontSize = 11.sp, color = CctrColors.InkPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                }
+                Surface(
+                    color = CctrColors.BgSheetSoft,
+                    border = BorderStroke(1.dp, CctrColors.BorderHairline),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.clickable { webViewRef?.reload() }
+                ) {
+                    Text("↻ 刷新", fontSize = 11.sp, color = CctrColors.InkPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                }
+                WebPlatformExtractor.PLATFORM_PRESETS.forEach { preset ->
+                    Surface(
+                        color = CctrColors.BgSubtle,
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.clickable { webViewRef?.loadUrl(preset.url) }
+                    ) {
+                        Text(preset.label, fontSize = 11.sp, color = CctrColors.InkPrimary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                    }
+                }
+            }
+        }
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(CctrColors.BorderHairline))
+
+        AndroidView(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    CookieManager.getInstance().setAcceptCookie(true)
+                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        databaseEnabled = true
+                        userAgentString = WebPlatformExtractor.DESKTOP_USER_AGENT
+                        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                        useWideViewPort = true
+                        loadWithOverviewMode = true
+                        setSupportZoom(true)
+                        builtInZoomControls = true
+                        displayZoomControls = false
+                    }
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            view?.evaluateJavascript(WebPlatformExtractor.XHR_INTERCEPT_JS, null)
+                        }
+                    }
+                    webViewRef = this
+                    loadUrl(state.browserInitialUrl)
+                }
+            }
+        )
     }
 }
 
 private fun openExportedFile(context: Context, file: File) {
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val mime = if (file.name.endsWith(".zip", true)) "application/zip" else "application/pdf"
+    val n = file.name.lowercase()
+    val mime = when {
+        n.endsWith(".zip") -> "application/zip"
+        n.endsWith(".xlsx") -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        n.endsWith(".tsv") -> "text/tab-separated-values"
+        n.endsWith(".md") -> "text/markdown"
+        n.endsWith(".json") -> "application/json"
+        else -> "application/pdf"
+    }
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(uri, mime)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

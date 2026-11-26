@@ -211,7 +211,18 @@ class PdfAndZipExporter(private val context: Context) {
                     if (scheme == "data" || scheme == "about") return null
                     if (scheme == "https" && (
                             host == "cctrcloud.net" || host.endsWith(".cctrcloud.net") ||
-                            host == "aliyuncs.com" || host.endsWith(".aliyuncs.com")
+                            host == "aliyuncs.com" || host.endsWith(".aliyuncs.com") ||
+                            host == "chaoxing.com" || host.endsWith(".chaoxing.com") ||
+                            host == "xuexitong.com" || host.endsWith(".xuexitong.com") ||
+                            host == "ddfv2.com" || host.endsWith(".ddfv2.com") ||
+                            host == "yuketang.cn" || host.endsWith(".yuketang.cn") ||
+                            host == "xuetangx.com" || host.endsWith(".xuetangx.com") ||
+                            host == "myqcloud.com" || host.endsWith(".myqcloud.com") ||
+                            host == "qcloud.com" || host.endsWith(".qcloud.com") ||
+                            host == "icourse163.org" || host.endsWith(".icourse163.org") ||
+                            host == "126.net" || host.endsWith(".126.net") ||
+                            host == "zhihuishu.com" || host.endsWith(".zhihuishu.com") ||
+                            host == "icve.com.cn" || host.endsWith(".icve.com.cn")
                         )
                     ) return null
                     return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
@@ -766,6 +777,44 @@ class PdfAndZipExporter(private val context: Context) {
             createdAt = ts,
             questionCount = questions.size,
             format = ExportFormat.CATEGORIZED_ZIP
+        )
+    }
+
+    suspend fun exportFormattedFile(
+        questions: List<QuestionItem>,
+        format: ExportFormat,
+        variant: AnswerVariant,
+        baseName: String,
+        onProgress: (String, Float?) -> Unit
+    ): ExportedFileEntry = withContext(Dispatchers.IO) {
+        Integrity.validateQuestions(questions)
+        onProgress("正在转换 ${questions.size} 道题为 ${format.label}…", 0.55f)
+        val bytes = when (format) {
+            ExportFormat.EXCEL_XLSX -> FormatConverter.exportToXlsx(questions, variant, baseName)
+            ExportFormat.ANKI_TSV -> FormatConverter.exportToAnkiTsv(questions, baseName)
+            ExportFormat.MARKDOWN_MD -> FormatConverter.exportToMarkdown(questions, variant, baseName)
+            ExportFormat.STANDARD_JSON -> FormatConverter.exportToJson(questions, variant, baseName)
+            else -> error("不支持的快捷格式：$format")
+        }
+        val vTag = when (variant) {
+            AnswerVariant.WITH_ANSWERS_RED -> "红标答案"
+            AnswerVariant.WITH_ANSWERS_PLAIN -> "普通答案"
+            AnswerVariant.WITHOUT_ANSWERS -> "无答案"
+        }
+        val ts = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.CHINA).format(Date())
+        val fileName = "${Integrity.safeArchiveSegment(baseName)}_${vTag}_$ts.${format.ext}"
+        val dir = File(context.filesDir, "exports").apply { mkdirs() }
+        val localFile = File(dir, fileName)
+        localFile.writeBytes(bytes)
+        onProgress("正在写入系统 Download/CCTRExport 目录…", 0.92f)
+        mirrorToDownloads(fileName, format.mimeType, localFile)
+        ExportedFileEntry(
+            name = fileName,
+            path = localFile.absolutePath,
+            sizeBytes = localFile.length(),
+            createdAt = ts,
+            questionCount = questions.size,
+            format = format
         )
     }
 

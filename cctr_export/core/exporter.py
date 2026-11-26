@@ -29,14 +29,27 @@ from .integrity import (
 from .kernels import detect_kernel, get_preferred_kernel, resolve_render_backend
 from .models import Option, Question
 
+_ALLOWED_REMOTE_HOSTS = (
+    r"cctrcloud\.net|cctrcloud\.com|aliyuncs\.com|alicdn\.com|tbcdn\.cn|"
+    r"chaoxing\.com|xuexitong\.com|ddfv2\.com|"
+    r"yuketang\.cn|xuetangx\.com|rainclassroom\.com|myqcloud\.com|qcloud\.com|"
+    r"icourse163\.org|126\.net|zhihuishu\.com|icve\.com\.cn|ulearning\.cn|"
+    r"ketangpai\.com|pintia\.cn|educoder\.net|bcebos\.com|myhuaweicloud\.com|"
+    r"huaweicloud\.com|ksyun\.com|volces\.com|qiniucdn\.com|clouddn\.com|"
+    r"ufileos\.com|edu\.cn"
+)
 _REMOTE_IMG_ATTR_RE = re.compile(
-    r'(<img\b[^>]*?\bsrc\s*=\s*["\'])(https?://(?:[a-z0-9-]+\.)*(?:cctrcloud\.net|aliyuncs\.com)(?::(?:80|443))?/[^"\']+)(["\'])',
+    rf'(<img\b[^>]*?\bsrc\s*=\s*["\'])((?:https?:)?//(?:[a-z0-9-]+\.)*(?:{_ALLOWED_REMOTE_HOSTS})(?::(?:80|443))?/[^"\']+)(["\'])',
     re.I,
 )
 
 
 def _norm_img_url(url: str) -> str:
-    u = url.strip()
+    import html as _html
+
+    u = _html.unescape(url.strip())
+    if u.startswith("//"):
+        return "https:" + u
     if u.lower().startswith("http://"):
         return "https://" + u[len("http://"):]
     return u
@@ -49,7 +62,7 @@ def prefetch_and_inline_images(questions: list[Question]) -> list[Question]:
     for q in questions:
         fields = [q.subject_html, q.answer, q.analysis_html] + [o.html for o in q.options]
         for fld in fields:
-            if not fld or "://" not in fld:
+            if not fld or "<img" not in fld.lower():
                 continue
             for m in _REMOTE_IMG_ATTR_RE.finditer(fld):
                 u = m.group(2).strip()
@@ -115,7 +128,7 @@ def prefetch_and_inline_images(questions: list[Question]) -> list[Question]:
         return questions
 
     def _inline_field(text: str) -> str:
-        if not text or "://" not in text:
+        if not text or "<img" not in text.lower():
             return text
         return _REMOTE_IMG_ATTR_RE.sub(
             lambda m: f"{m.group(1)}{raw_map.get(m.group(2).strip(), m.group(2))}{m.group(3)}",

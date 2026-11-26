@@ -33,7 +33,7 @@ class CaptchaOcr(context: Context) : AutoCloseable {
         charset = List(arr.length()) { i -> arr.optString(i, "") }
     }
 
-    fun recognize(imageBytes: ByteArray): String {
+    private fun decodeRawText(imageBytes: ByteArray): String {
         val raw = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size) ?: return ""
         return try {
             val targetH = 64
@@ -76,7 +76,7 @@ class CaptchaOcr(context: Context) : AutoCloseable {
                             }
                             prevIdx = bestIdx
                         }
-                        sb.toString().replace(Regex("[^A-Za-z0-9]"), "")
+                        sb.toString()
                     }
                 }
             } finally {
@@ -85,6 +85,16 @@ class CaptchaOcr(context: Context) : AutoCloseable {
         } finally {
             raw.recycle()
         }
+    }
+
+    @Synchronized
+    fun recognize(imageBytes: ByteArray): String {
+        return decodeRawText(imageBytes).replace(Regex("[^A-Za-z0-9]"), "")
+    }
+
+    @Synchronized
+    fun recognizeSingleGlyph(imageBytes: ByteArray): String {
+        return decodeRawText(imageBytes).trim().take(1)
     }
 
     override fun close() {

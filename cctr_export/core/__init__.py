@@ -33,6 +33,12 @@ _EXPORTS = {
     "recognize_captcha": (".captcha_ocr", "recognize_captcha"),
     "ResilientHttpSession": (".http_utils", "ResilientHttpSession"),
     "sniff_image_mime": (".http_utils", "sniff_image_mime"),
+    "import_questions_from_file": (".formats", "import_questions_from_file"),
+    "export_questions_to_xlsx": (".formats", "export_questions_to_xlsx"),
+    "export_questions_to_anki_tsv": (".formats", "export_questions_to_anki_tsv"),
+    "export_questions_to_markdown": (".formats", "export_questions_to_markdown"),
+    "export_questions_to_json": (".formats", "export_questions_to_json"),
+    "save_local_bank": (".formats", "save_local_bank"),
 }
 
 __all__ = list(_EXPORTS.keys())

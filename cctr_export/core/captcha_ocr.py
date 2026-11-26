@@ -7,6 +7,7 @@ import threading
 from typing import Optional
 
 _ocr_lock = threading.Lock()
+_infer_lock = threading.Lock()
 _ocr_instance = None
 _ocr_import_checked = False
 _ocr_available_flag = False
@@ -65,13 +66,25 @@ def recognize_captcha(img_bytes: bytes, expected_len: int = 4, uppercase: bool =
         return ""
 
     ocr = _get_ocr()
-    raw_code = _clean_code(ocr.classification(img_bytes))
+    with _infer_lock:
+        raw_code = _clean_code(ocr.classification(img_bytes))
 
     if len(raw_code) != expected_len:
         enhanced = _upscale_grayscale_png(img_bytes)
         if enhanced:
-            alt_code = _clean_code(ocr.classification(enhanced))
+            with _infer_lock:
+                alt_code = _clean_code(ocr.classification(enhanced))
             if len(alt_code) == expected_len or (not raw_code and alt_code):
                 raw_code = alt_code
 
     return raw_code.upper() if uppercase else raw_code
+
+
+def recognize_single_char(img_bytes: bytes) -> str:
+    """识别单个混淆字体渲染汉字（用于超星学习通 font-cxsecret 与雨课堂字体还原）。"""
+    if not img_bytes or not is_ocr_available():
+        return ""
+    ocr = _get_ocr()
+    with _infer_lock:
+        res = str(ocr.classification(img_bytes) or "").strip()
+    return res[:1] if res else ""

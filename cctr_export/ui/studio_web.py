@@ -13,9 +13,18 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QFile, QIODevice, QObject, QSize, QThread, QTimer, QUrl, Qt, Signal, Slot
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWebChannel import QWebChannel
-from PySide6.QtWebEngineCore import QWebEngineScript, QWebEngineSettings
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineScript, QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QFileDialog, QMainWindow
+from PySide6.QtWidgets import (
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+)
 
 from ..core.api import CCTRClient
 from ..core.captcha_ocr import is_ocr_available, recognize_captcha
@@ -30,6 +39,7 @@ from ..core.database import (
     update_task_status,
 )
 from ..core.exporter import init_qt_pdf_bridge
+from ..core.formats import get_local_bank_filters, import_questions_from_file, save_local_bank
 from ..core.kernels import (
     KERNEL_LABELS,
     cleanup_empty_legacy_output_dirs,
@@ -44,6 +54,13 @@ from ..core.kernels import (
 )
 from ..core.models import ChapterType, Practice, QuestionType
 from ..core.tasks import engine
+from ..core.web_capture import (
+    DETECT_PAGE_STATUS_JS,
+    EXTRACT_QUESTIONS_JS,
+    PLATFORM_PRESETS,
+    XHR_INTERCEPT_JS,
+    build_questions_from_capture,
+)
 
 
 def _build_atelier_icon() -> QIcon:
@@ -266,17 +283,37 @@ class _LoginWorker(QThread):
         self.done.emit(json.dumps({"ok": False, "error": last_err or "登录失败"}, ensure_ascii=False))
 
 
+def _practice_payload(p: Practice) -> dict:
+    return {
+        "id": p.id,
+        "courseid": p.courseid,
+        "practise_id": p.practise_id,
+        "teacher_id": p.teacher_id,
+        "lesson_name": p.lesson_name,
+        "practice_name": p.practice_name,
+        "teacher_name": p.teacher_name,
+        "finish_time": p.finish_time,
+        "question_count": p.question_count,
+        "json": p.to_json(),
+    }
+
+
 class _FilterWorker(QThread):
     done = Signal(str)
 
-    def __init__(self, client: CCTRClient, practice: Practice):
+    def __init__(self, client: CCTRClient | None, practice: Practice):
         super().__init__()
         self._client = client
         self._practice = practice
 
     def run(self):
         try:
-            chapters, qtypes = self._client.get_chapter_and_question_type(self._practice)
+            if self._practice.courseid == "__local_bank__":
+                chapters, qtypes = get_local_bank_filters(self._practice.practise_id)
+            else:
+                if self._client is None:
+                    raise RuntimeError("请先登录融智云考")
+                chapters, qtypes = self._client.get_chapter_and_question_type(self._practice)
             self.done.emit(
                 json.dumps(
                     {
@@ -289,6 +326,225 @@ class _FilterWorker(QThread):
             )
         except Exception as e:
             self.done.emit(json.dumps({"ok": False, "chapters": [], "question_types": [], "error": str(e)}, ensure_ascii=False))
+
+
+class _ImportFilesWorker(QThread):
+    done = Signal(str)
+
+    def __init__(self, file_paths: list[str]):
+        super().__init__()
+        self._file_paths = file_paths
+
+    def run(self):
+        loaded: list[dict] = []
+        errors: list[str] = []
+        for fp in self._file_paths:
+            try:
+                title, qs = import_questions_from_file(fp)
+                src = f"本地导入 ({Path(fp).suffix.lstrip('.').upper()})"
+                p = save_local_bank(title=title, source_label=src, questions=qs)
+                loaded.append(_practice_payload(p))
+            except Exception as e:
+                errors.append(f"{Path(fp).name}: {e}")
+        self.done.emit(json.dumps({"ok": bool(loaded), "practices": loaded, "errors": errors}, ensure_ascii=False))
+
+
+class _CaptureDecryptWorker(QThread):
+    done = Signal(str)
+
+    def __init__(self, raw_json: str):
+        super().__init__()
+        self._raw_json = raw_json
+
+    def run(self):
+        try:
+            payload = json.loads(self._raw_json)
+            title, qs = build_questions_from_capture(payload)
+            src = str(payload.get("sourceLabel") or payload.get("platform") or "网页捕获")
+            p = save_local_bank(title=title, source_label=src, questions=qs)
+            self.done.emit(json.dumps({
+                "ok": True,
+                "practice": _practice_payload(p),
+                "title": title,
+                "count": len(qs),
+                "decryptedGlyphs": len(payload.get("secretGlyphs") or []),
+            }, ensure_ascii=False))
+        except Exception as e:
+            self.done.emit(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
+
+
+class PlatformBrowserDialog(QDialog):
+    """内置多平台登录与作业捕获浏览器（持久化 Cookie，支持学习通 font-cxsecret 与雨课堂字体还原）。"""
+
+    def __init__(self, parent=None, initial_key: str = "chaoxing"):
+        super().__init__(parent)
+        self.setWindowTitle("CCTR Atelier · 网页登录与题库捕获（学习通 / 雨课堂）")
+        self.resize(1180, 780)
+        self.captured_practices: list[dict] = []
+        self._workers: list[QThread] = []
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        bar = QWidget_bar = QHBoxLayout()
+        bar.setContentsMargins(12, 8, 12, 8)
+        bar.setSpacing(8)
+
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(6)
+        for key, (label, url) in PLATFORM_PRESETS.items():
+            btn = QPushButton(label, self)
+            btn.setStyleSheet(
+                "QPushButton{padding:5px 10px;border:1px solid #cbc7bd;border-radius:5px;background:#faf9f6;color:#141413;font-size:12px;}"
+                "QPushButton:hover{background:#eae7e0;}"
+            )
+            btn.clicked.connect(lambda _chk=False, u=url: self._web.load(QUrl(u)))
+            preset_row.addWidget(btn)
+        bar.addLayout(preset_row)
+
+        back_btn = QPushButton("←", self)
+        back_btn.setFixedWidth(32)
+        reload_btn = QPushButton("↻", self)
+        reload_btn.setFixedWidth(32)
+        for b in (back_btn, reload_btn):
+            b.setStyleSheet("QPushButton{padding:5px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;}")
+        bar.addWidget(back_btn)
+        bar.addWidget(reload_btn)
+
+        self._url_edit = QLineEdit(self)
+        self._url_edit.setStyleSheet("padding:5px 9px;border:1px solid #cbc7bd;border-radius:5px;background:#fff;color:#141413;font-size:12px;")
+        bar.addWidget(self._url_edit, 1)
+
+        self._status_lbl = QLabel("请正常扫码或输入账号密码登录，然后打开作业/测验详情页", self)
+        self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 6px;")
+        bar.addWidget(self._status_lbl)
+
+        self._extract_btn = QPushButton("提取本页题目", self)
+        self._extract_btn.setStyleSheet(
+            "QPushButton{padding:6px 14px;border:none;border-radius:5px;background:#1e6b4e;color:#faf9f6;font-weight:600;font-size:12px;}"
+            "QPushButton:hover{background:#18573f;}"
+            "QPushButton:disabled{opacity:0.5;background:#8a867e;}"
+        )
+        bar.addWidget(self._extract_btn)
+
+        self._finish_btn = QPushButton("送入工作台 (0)", self)
+        self._finish_btn.setEnabled(False)
+        self._finish_btn.setStyleSheet(
+            "QPushButton{padding:6px 14px;border:none;border-radius:5px;background:#141413;color:#faf9f6;font-weight:600;font-size:12px;}"
+            "QPushButton:disabled{background:#cbc7bd;color:#57544e;}"
+        )
+        bar.addWidget(self._finish_btn)
+
+        bar_container = self._wrap_bar(bar)
+        root.addWidget(bar_container)
+
+        profile_dir = Path.home() / ".cctr_export" / "browser_profile"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        self._profile = QWebEngineProfile("cctr_atelier_browser", self)
+        self._profile.setPersistentStoragePath(str(profile_dir))
+        self._profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
+
+        hook = QWebEngineScript()
+        hook.setName("cctr_xhr_intercept")
+        hook.setSourceCode(XHR_INTERCEPT_JS)
+        hook.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
+        hook.setWorldId(QWebEngineScript.ScriptWorldId.MainWorld)
+        hook.setRunsOnSubFrames(True)
+        self._profile.scripts().insert(hook)
+
+        self._page = QWebEnginePage(self._profile, self)
+        self._web = QWebEngineView(self)
+        self._web.setPage(self._page)
+        self._web.settings().setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        root.addWidget(self._web, 1)
+
+        back_btn.clicked.connect(self._web.back)
+        reload_btn.clicked.connect(self._web.reload)
+        self._url_edit.returnPressed.connect(lambda: self._web.load(QUrl.fromUserInput(self._url_edit.text().strip())))
+        self._web.urlChanged.connect(lambda u: self._url_edit.setText(u.toString()))
+        self._extract_btn.clicked.connect(self._on_extract_clicked)
+        self._finish_btn.clicked.connect(self.accept)
+
+        self._probe_timer = QTimer(self)
+        self._probe_timer.timeout.connect(self._probe_page)
+        self._probe_timer.start(1500)
+
+        _, start_url = PLATFORM_PRESETS.get(initial_key, PLATFORM_PRESETS["chaoxing"])
+        self._web.load(QUrl(start_url))
+
+    @staticmethod
+    def _wrap_bar(layout: QHBoxLayout):
+        from PySide6.QtWidgets import QWidget
+        w = QWidget()
+        w.setStyleSheet("background:#f4f3ef;border-bottom:1px solid #e2dfd7;")
+        w.setLayout(layout)
+        return w
+
+    def _probe_page(self):
+        if not self.isVisible():
+            return
+        self._page.runJavaScript(DETECT_PAGE_STATUS_JS, self._on_probe_result)
+
+    def _on_probe_result(self, raw):
+        try:
+            info = json.loads(raw) if isinstance(raw, str) else {}
+        except Exception:
+            return
+        cnt = int(info.get("estCount") or 0)
+        hint = info.get("platformHint") or "网页"
+        if cnt > 0:
+            self._status_lbl.setText(f"✓ 检测到 {hint} 约 {cnt} 道题，可点击「提取本页题目」")
+            self._status_lbl.setStyleSheet("color:#1e6b4e;font-weight:600;font-size:12px;padding:0 6px;")
+        else:
+            self._status_lbl.setText(f"{hint} · 请进入具体作业/测验/练习页后提取")
+            self._status_lbl.setStyleSheet("color:#57544e;font-size:12px;padding:0 6px;")
+
+    def _on_extract_clicked(self):
+        self._extract_btn.setEnabled(False)
+        self._extract_btn.setText("提取与字形解密中…")
+        self._page.runJavaScript(EXTRACT_QUESTIONS_JS, self._on_js_extracted)
+
+    def _on_js_extracted(self, raw):
+        if not isinstance(raw, str):
+            self._extract_btn.setEnabled(True)
+            self._extract_btn.setText("提取本页题目")
+            self._status_lbl.setText("✗ 页面未返回有效数据，请刷新后重试")
+            self._status_lbl.setStyleSheet("color:#c83e2b;font-weight:600;font-size:12px;padding:0 6px;")
+            return
+        w = _CaptureDecryptWorker(raw)
+        self._workers.append(w)
+        w.done.connect(self._on_decrypt_done)
+        w.finished.connect(lambda: self._workers.remove(w) if w in self._workers else None)
+        w.start()
+
+    def _on_decrypt_done(self, res_json: str):
+        self._extract_btn.setEnabled(True)
+        self._extract_btn.setText("提取本页题目")
+        try:
+            res = json.loads(res_json)
+        except Exception:
+            res = {"ok": False, "error": "解析失败"}
+        if not res.get("ok"):
+            self._status_lbl.setText(f"✗ {res.get('error') or '提取失败'}")
+            self._status_lbl.setStyleSheet("color:#c83e2b;font-weight:600;font-size:12px;padding:0 6px;")
+            return
+        self.captured_practices.append(res["practice"])
+        g_cnt = int(res.get("decryptedGlyphs") or 0)
+        extra = f"（已自动还原 {g_cnt} 个加密字形）" if g_cnt > 0 else ""
+        self._status_lbl.setText(f"✓ 已加入「{res['title']}」{res['count']} 题{extra}")
+        self._status_lbl.setStyleSheet("color:#1e6b4e;font-weight:600;font-size:12px;padding:0 6px;")
+        self._finish_btn.setEnabled(True)
+        self._finish_btn.setText(f"送入工作台 ({len(self.captured_practices)})")
+
+    def closeEvent(self, event):
+        self._probe_timer.stop()
+        for w in list(self._workers):
+            w.quit()
+            w.wait(1500)
+        self._web.setPage(None)
+        self._page.deleteLater()
+        super().closeEvent(event)
 
 
 class _KernelWorker(QThread):
@@ -319,6 +575,7 @@ class DesktopBridge(QObject):
     captchaReady = Signal(str)
     loginDone = Signal(str)
     filtersReady = Signal(str)
+    externalBanksLoaded = Signal(str)
     stateChanged = Signal(str)
     kernelProgress = Signal(int, str)
     kernelDone = Signal(str)
@@ -465,16 +722,52 @@ class DesktopBridge(QObject):
         return json.dumps({"savedAccounts": remove_saved_account(school, username)}, ensure_ascii=False)
 
     @Slot(str)
+    def openPlatformBrowser(self, platform_key: str):
+        parent_w = self._main_win()
+        dlg = PlatformBrowserDialog(parent_w, initial_key=platform_key or "chaoxing")
+        dlg.exec()
+        if dlg.captured_practices:
+            self.externalBanksLoaded.emit(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "sourceLabel": "学习通 / 雨课堂",
+                        "practices": dlg.captured_practices,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+
+    @Slot()
+    def importLocalFiles(self):
+        parent_w = self._main_win()
+        files, _ = QFileDialog.getOpenFileNames(
+            parent_w,
+            "导入题库文件（支持考试宝/磨题帮 Excel、Word、TXT、Markdown、JSON、CSV/Anki）",
+            "",
+            "题库文件 (*.xlsx *.docx *.txt *.md *.markdown *.json *.csv *.tsv);;所有文件 (*.*)",
+        )
+        if not files:
+            return
+        w = _ImportFilesWorker(files)
+
+        def on_done(raw: str):
+            res = json.loads(raw)
+            res["sourceLabel"] = "本地导入题库"
+            self.externalBanksLoaded.emit(json.dumps(res, ensure_ascii=False))
+
+        w.done.connect(on_done)
+        self._keep_worker(w)
+
+    @Slot(str)
     def loadFilters(self, practice_json: str):
         p = Practice.from_json(practice_json)
-        w = _FilterWorker(self._ensure_client(), p)
+        w = _FilterWorker(self._client, p)
         w.done.connect(self.filtersReady.emit)
         self._keep_worker(w)
 
     @Slot(str, result=str)
     def submitExport(self, payload_json: str) -> str:
-        if not self._client or not self._client.key:
-            return json.dumps({"ok": False, "error": "会话已失效，请重新登录"}, ensure_ascii=False)
         try:
             body = json.loads(payload_json)
             fmt = ExportType(body.get("format", "pdf"))
@@ -487,6 +780,13 @@ class DesktopBridge(QObject):
             if not practices_json:
                 return json.dumps({"ok": False, "error": "请至少选择一个练习"}, ensure_ascii=False)
 
+            needs_cctr = any(
+                Practice.from_json(pj).courseid != "__local_bank__"
+                for pj in practices_json
+            )
+            if needs_cctr and (not self._client or not self._client.key):
+                return json.dumps({"ok": False, "error": "会话已失效，请重新登录"}, ensure_ascii=False)
+
             config = [
                 {
                     "practice": pj,
@@ -498,13 +798,17 @@ class DesktopBridge(QObject):
                 }
                 for pj in practices_json
             ]
+            school_id = self._client.school_id if (self._client and self._client.key) else "multi"
+            username = self._client.username if (self._client and self._client.key) else "多平台工作台"
+            password = self._client.password if (self._client and self._client.key) else ""
+            auth_key = self._client.key if (self._client and self._client.key) else ""
             task_id = add_task(
-                self._client.school_id,
-                self._client.username,
-                self._client.password,
+                school_id,
+                username,
+                password,
                 fmt,
                 config,
-                auth_key=self._client.key,
+                auth_key=auth_key,
             )
             engine.run_task(task_id)
             self.poll_state(force=True)
